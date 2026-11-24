@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="TRACKS_", env_file=".env", extra="ignore")
 
     database_url: str = "postgresql+psycopg://tracks:tracks@localhost:5442/tracks"
+    catalogue_path: Path = Path("data/catalogue.csv")
 
 
 def load_rules(path: Path = RULES_PATH) -> GameRules:

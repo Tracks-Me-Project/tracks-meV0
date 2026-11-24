@@ -39,6 +39,6 @@ def engine():
 @pytest.fixture
 def session(engine) -> Iterator[Session]:
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE ledger, accounts RESTART IDENTITY CASCADE"))
+        conn.execute(text("TRUNCATE ledger, accounts, tracks RESTART IDENTITY CASCADE"))
     with Session(engine) as s:
         yield s
