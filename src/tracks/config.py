@@ -15,6 +15,10 @@ class _Frozen(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class AccountRules(_Frozen):
+    starting_coins: int
+
+
 class AuctionRules(_Frozen):
     durations_minutes: list[int]
     min_raise_percent: int
@@ -51,6 +55,7 @@ class RecyclingRules(_Frozen):
 
 
 class GameRules(_Frozen):
+    account: AccountRules
     auction: AuctionRules
     bet: BetRules
     booster: BoosterRules
