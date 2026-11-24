@@ -6,16 +6,13 @@ from sqlalchemy.orm import Session
 
 from tracks import boosters, collection
 from tracks.api.accounts import current_account
-from tracks.clock import Clock, SystemClock
+from tracks.api.deps import Offset, get_clock
+from tracks.clock import Clock
 from tracks.config import get_rules
 from tracks.db import get_session
 from tracks.models import Account, Track
 
 router = APIRouter()
-
-
-def get_clock() -> Clock:
-    return SystemClock()
 
 
 def get_rng() -> random.Random:
@@ -68,7 +65,7 @@ def my_collection(
     account: Annotated[Account, Depends(current_account)],
     session: Annotated[Session, Depends(get_session)],
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Offset = 0,
 ) -> list[dict]:
     rows = collection.list_collection(session, account.id, limit, offset)
     return [{**_track(t), "quantity": q} for t, q in rows]

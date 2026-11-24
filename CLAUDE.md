@@ -50,3 +50,11 @@ Le catalogue (MusicBrainz) n'est **pas versionné** sans mon accord (licence). �
 ## Plan
 
 0. Squelette · 1. Comptes + journal de monnaie · 2. Catalogue, boosters, collection · 3. Recyclage · 4. Enchères · 5. Paris au podium · 6. Joueurs virtuels + tentatives d'abus (double dépense, mises simultanées).
+
+## Commandes
+
+- Base : `docker compose up -d` (Postgres sur le port 5442), puis `alembic upgrade head`.
+- Tests : `ruff check . && pytest` (utilisent la base `tracks_test`, recréée à chaque session).
+- API : `uvicorn tracks.main:app --port 8001` (le 8000 est souvent pris).
+- Simulation : `python -m tracks.simulation.run --bots 20 --days 3 --seed 1` (base `tracks_sim`,
+  vidée à chaque lancement ; dure environ 3 minutes).
