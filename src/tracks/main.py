@@ -3,11 +3,12 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
 
-from tracks.api import accounts
+from tracks.api import accounts, boosters
 from tracks.db import check_db
 
 app = FastAPI(title="tracks")
 app.include_router(accounts.router)
+app.include_router(boosters.router)
 
 
 def get_db_check() -> Callable[[], None]:
