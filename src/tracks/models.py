@@ -72,3 +72,33 @@ class BoosterState(Base):
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True)
     stock: Mapped[int]
     last_credited_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class Auction(Base):
+    __tablename__ = "auctions"
+    __table_args__ = (
+        CheckConstraint("start_price > 0", name="start_price_positive"),
+        CheckConstraint("status IN ('open', 'sold', 'unsold', 'cancelled')", name="status_valid"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), index=True)
+    recording_mbid: Mapped[str] = mapped_column(ForeignKey("tracks.recording_mbid"))
+    start_price: Mapped[int]
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    status: Mapped[str] = mapped_column(String(10), default="open")
+    winner_id: Mapped[int | None] = mapped_column(ForeignKey("accounts.id"))
+    final_price: Mapped[int | None]
+
+
+class Bid(Base):
+    """Historique des mises. La mise courante est la plus élevée."""
+
+    __tablename__ = "bids"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    auction_id: Mapped[int] = mapped_column(ForeignKey("auctions.id"), index=True)
+    bidder_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
+    amount: Mapped[int]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

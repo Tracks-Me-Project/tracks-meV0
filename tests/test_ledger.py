@@ -86,3 +86,14 @@ def test_concurrent_locks_cannot_double_spend(engine, session):
     [t.start() for t in threads]
     [t.join() for t in threads]
     assert sorted(results) == ["ok", "refused"]
+
+
+def test_lock_sees_balance_changed_by_another_transaction(engine, session):
+    """Régression : un compte chargé avant le verrou ne doit pas servir avec un solde périmé."""
+    a = _acc(session)
+    assert a.balance_available == 1000  # compte chargé (comme le fait l'authentification)
+    with Session(engine) as other:
+        ledger.lock(other, a.id, 600)
+        other.commit()
+    with pytest.raises(ledger.InsufficientFunds):
+        ledger.lock(session, a.id, 600)

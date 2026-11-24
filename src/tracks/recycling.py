@@ -60,6 +60,6 @@ def recycle(
     if coins > remaining:
         raise DailyCapExceeded(max(0, remaining))
 
-    item.quantity -= quantity
+    item.quantity = CollectionItem.quantity - quantity  # côté SQL : garde un ajout simultané
     ledger.credit(session, account_id, coins, "recycle", f"recycle:{recording_mbid}", at=now)
     return Recycled(quantity, coins, remaining - coins)

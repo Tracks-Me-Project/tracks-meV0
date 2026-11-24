@@ -5,12 +5,12 @@ from collections import Counter
 from datetime import datetime, timedelta
 
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from tracks import collection
 from tracks.clock import Clock
 from tracks.config import get_rules
-from tracks.models import BoosterState, CollectionItem, Track
+from tracks.models import BoosterState, Track
 
 
 class NoBoosterAvailable(Exception):
@@ -68,13 +68,7 @@ def open_booster(
     state.stock -= 1
     drawn = Counter(rng.choices(ids, k=rules.tracks_per_booster))
     for mbid, n in drawn.items():
-        stmt = insert(CollectionItem).values(account_id=account_id, recording_mbid=mbid, quantity=n)
-        session.execute(
-            stmt.on_conflict_do_update(
-                index_elements=["account_id", "recording_mbid"],
-                set_={"quantity": CollectionItem.quantity + n},
-            )
-        )
+        collection.add_copies(session, account_id, mbid, n)
     found = session.scalars(select(Track).where(Track.recording_mbid.in_(drawn)))
     by_id = {t.recording_mbid: t for t in found}
     return [by_id[m] for m in drawn]
