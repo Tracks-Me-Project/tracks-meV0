@@ -57,5 +57,6 @@ Le catalogue (MusicBrainz) n'est **pas versionné** sans mon accord (licence). �
 - Tests : `ruff check . && pytest` (utilisent la base `tracks_test`, recréée à chaque session).
 - API : `uvicorn tracks.main:app --port 8001` (le 8000 est souvent pris).
 - API en mode essai (enchères de 1 à 30 min, 1 booster/min) : `TRACKS_RULES_PATH=config/rules.essai.toml uvicorn tracks.main:app --port 8001`.
+- Interface : http://localhost:8001/app/ (jeton gardé par onglet : un onglet = un joueur).
 - Simulation : `python -m tracks.simulation.run --bots 20 --days 3 --seed 1` (base `tracks_sim`,
   vidée à chaque lancement ; dure environ 3 minutes).
