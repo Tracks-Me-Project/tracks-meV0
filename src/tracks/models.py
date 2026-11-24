@@ -1,0 +1,38 @@
+"""Tables. Le journal (ledger) est en ajout seul : jamais de UPDATE ni de DELETE dessus."""
+
+from datetime import datetime
+
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class Account(Base):
+    __tablename__ = "accounts"
+    __table_args__ = (
+        CheckConstraint("balance_available >= 0", name="available_non_negative"),
+        CheckConstraint("balance_locked >= 0", name="locked_non_negative"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50), unique=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    # Cache du solde : toujours égal à la somme du journal (vérifié par un test).
+    balance_available: Mapped[int] = mapped_column(default=0)
+    balance_locked: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LedgerEntry(Base):
+    __tablename__ = "ledger"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(20))
+    available_delta: Mapped[int]
+    locked_delta: Mapped[int]
+    ref: Mapped[str | None] = mapped_column(String(100))  # ex. "auction:12"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -1,6 +1,9 @@
 # Règles du jeu : seule source des valeurs. Ne rien écrire en dur dans le code.
 # Monnaie : entiers. Pourcentages : entiers (10 = 10 %).
 
+[account]
+starting_coins = 1000        # monnaie reçue à la création du compte
+
 [auction]
 durations_minutes = [30, 60, 180, 360, 720]
 min_raise_percent = 5
