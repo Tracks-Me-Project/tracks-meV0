@@ -1,15 +1,30 @@
+import asyncio
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
 
-from tracks.api import accounts, boosters, recycling
-from tracks.db import check_db
+from tracks.api import accounts, auctions, boosters, recycling
+from tracks.clock import SystemClock
+from tracks.config import get_rules
+from tracks.db import check_db, get_engine
+from tracks.settler import settle_loop
 
-app = FastAPI(title="tracks")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    interval = get_rules().auction.settle_interval_seconds
+    task = asyncio.create_task(settle_loop(get_engine(), SystemClock(), interval))
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="tracks", lifespan=lifespan)
 app.include_router(accounts.router)
 app.include_router(boosters.router)
 app.include_router(recycling.router)
+app.include_router(auctions.router)
 
 
 def get_db_check() -> Callable[[], None]:

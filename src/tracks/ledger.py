@@ -22,8 +22,12 @@ def _apply(
     at: datetime | None = None,
 ) -> None:
     # FOR UPDATE : deux opérations simultanées sur un compte passent l'une après l'autre.
+    # populate_existing : sans lui, un compte déjà chargé avant le verrou garderait un solde périmé.
     account = session.execute(
-        select(Account).where(Account.id == account_id).with_for_update()
+        select(Account)
+        .where(Account.id == account_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
     ).scalar_one()
     if account.balance_available + available < 0 or account.balance_locked + locked < 0:
         raise InsufficientFunds(kind)
@@ -42,6 +46,14 @@ def _apply(
         )
     )
     session.flush()
+
+
+def lock_accounts(session: Session, *account_ids: int) -> None:
+    """Verrouille plusieurs comptes toujours dans l'ordre des identifiants (évite les blocages
+    mutuels entre deux transactions qui touchent les mêmes comptes en sens inverse)."""
+    session.execute(
+        select(Account.id).where(Account.id.in_(account_ids)).order_by(Account.id).with_for_update()
+    ).all()
 
 
 def _positive(amount: int) -> int:

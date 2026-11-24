@@ -9,6 +9,8 @@ durations_minutes = [30, 60, 180, 360, 720]
 min_raise_percent = 5
 max_open_per_account = 5
 cancel_window_percent = 50      # le vendeur peut annuler pendant cette part de la durée
+min_start_price = 10            # pour que la mise d'un pari (10 %) soit au moins 1
+settle_interval_seconds = 5     # fréquence de la boucle qui règle les enchères échues
 
 [bet]
 stake_percent_of_start_price = 10

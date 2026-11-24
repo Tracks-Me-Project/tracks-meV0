@@ -24,6 +24,8 @@ class AuctionRules(_Frozen):
     min_raise_percent: int
     max_open_per_account: int
     cancel_window_percent: int
+    min_start_price: int
+    settle_interval_seconds: int
 
 
 class BetRules(_Frozen):
