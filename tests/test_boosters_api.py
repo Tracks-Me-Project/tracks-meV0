@@ -47,3 +47,19 @@ def test_open_without_stock_is_409(client, auth):
 
 def test_requires_token(client):
     assert client.get("/collection").status_code == 401
+
+
+def test_recycle_api(client, auth, session):
+    from tracks.models import CollectionItem
+
+    session.add(CollectionItem(account_id=1, recording_mbid="r1", quantity=4))
+    session.commit()
+
+    def recycle(quantity: int):
+        body = {"recording_mbid": "r1", "quantity": quantity}
+        return client.post("/collection/recycle", headers=auth, json=body)
+
+    assert recycle(3).json() == {"recycled": 3, "coins": 3, "remaining_cap_today": 47}
+    refused = recycle(1)
+    assert refused.status_code == 409 and refused.json()["detail"]["available"] == 0
+    assert recycle(0).status_code == 422

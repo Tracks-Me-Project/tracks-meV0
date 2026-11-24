@@ -1,5 +1,7 @@
 """Mouvements de monnaie. Aucune fonction ne commit : l'appelant maîtrise la transaction."""
 
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,7 +13,13 @@ class InsufficientFunds(Exception):
 
 
 def _apply(
-    session: Session, account_id: int, kind: str, available: int, locked: int, ref: str | None
+    session: Session,
+    account_id: int,
+    kind: str,
+    available: int,
+    locked: int,
+    ref: str | None,
+    at: datetime | None = None,
 ) -> None:
     # FOR UPDATE : deux opérations simultanées sur un compte passent l'une après l'autre.
     account = session.execute(
@@ -21,6 +29,8 @@ def _apply(
         raise InsufficientFunds(kind)
     account.balance_available += available
     account.balance_locked += locked
+    # at = heure de l'horloge injectée ; sans elle, c'est l'heure de la base.
+    when = {} if at is None else {"created_at": at}
     session.add(
         LedgerEntry(
             account_id=account_id,
@@ -28,6 +38,7 @@ def _apply(
             available_delta=available,
             locked_delta=locked,
             ref=ref,
+            **when,
         )
     )
     session.flush()
@@ -39,9 +50,16 @@ def _positive(amount: int) -> int:
     return amount
 
 
-def credit(session: Session, account_id: int, amount: int, kind: str, ref: str | None = None):
+def credit(
+    session: Session,
+    account_id: int,
+    amount: int,
+    kind: str,
+    ref: str | None = None,
+    at: datetime | None = None,
+) -> None:
     """Monnaie créée ou gagnée : kind = grant, payout, recycle, refund..."""
-    _apply(session, account_id, kind, _positive(amount), 0, ref)
+    _apply(session, account_id, kind, _positive(amount), 0, ref, at)
 
 
 def lock(session: Session, account_id: int, amount: int, ref: str | None = None) -> None:
