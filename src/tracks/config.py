@@ -69,6 +69,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+psycopg://tracks:tracks@localhost:5442/tracks"
     catalogue_path: Path = Path("data/catalogue.csv")
+    rules_path: Path = RULES_PATH  # TRACKS_RULES_PATH=config/rules.essai.toml : durées courtes
 
 
 def load_rules(path: Path = RULES_PATH) -> GameRules:
@@ -78,7 +79,7 @@ def load_rules(path: Path = RULES_PATH) -> GameRules:
 
 @lru_cache
 def get_rules() -> GameRules:
-    return load_rules()
+    return load_rules(get_settings().rules_path)
 
 
 @lru_cache
