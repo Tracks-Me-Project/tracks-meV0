@@ -170,19 +170,25 @@ def test_no_bid_after_end(session, clock, world):
 
 # --- annulation -----------------------------------------------------------------------------
 
-def test_cancel_refunds_bid_and_returns_card(session, clock, world):
+def test_cancel_returns_card(session, clock, world):
     seller, a, _ = world
     auction = _sell(session, clock, seller)
-    auctions.place_bid(session, auction.id, a.id, 100, clock)
-    session.commit()
     clock.advance(timedelta(minutes=29))
     auctions.cancel(session, auction.id, seller.id, clock)
     session.commit()
-    assert _balances(session, a) == (1000, 0)
     assert _copies(session, seller) == 2
     assert session.get(Auction, auction.id).status == "cancelled"
     with pytest.raises(auctions.AuctionClosed):
         auctions.place_bid(session, auction.id, a.id, 100, clock)
+
+
+def test_cancel_refused_once_a_bid_exists(session, clock, world):
+    seller, a, _ = world
+    auction = _sell(session, clock, seller)
+    auctions.place_bid(session, auction.id, a.id, 100, clock)
+    session.commit()
+    with pytest.raises(auctions.HasBids):
+        auctions.cancel(session, auction.id, seller.id, clock)
 
 
 def test_cancel_refused_after_half_or_by_other(session, clock, world):

@@ -73,3 +73,34 @@ def test_error_codes(client, session):
                        ).status_code == 409
     assert client.get("/auctions/999", headers=a).status_code == 404
     assert client.get("/auctions").status_code == 401
+
+
+def test_bets_api_flow(client, session, clock):
+    seller = _player(client, session, "s", 1)
+    p1, p2, w = (_player(client, session, n) for n in ("p1", "p2", "w"))
+    aid = client.post("/auctions", headers=seller, json={
+        "recording_mbid": "r1", "start_price": 100, "duration_minutes": 60}).json()
+    assert aid["bet_stake"] == 10
+    aid = aid["id"]
+
+    def bet(headers, guess):
+        return client.post(f"/auctions/{aid}/bets", headers=headers, json={"prediction": guess})
+
+    assert bet(p1, 150).json() == {"auction_id": aid, "prediction": 150, "stake": 10}
+    assert bet(p1, 160).status_code == 409                                    # un seul pari
+    assert bet(seller, 150).status_code == 409                                # propre enchère
+    low = bet(p2, 50)
+    assert low.status_code == 409 and low.json()["detail"]["minimum"] == 100
+    assert bet(p2, 300).status_code == 201
+    assert client.post(f"/auctions/{aid}/bids", headers=p1, json={"amount": 120}).status_code == 409
+    assert client.post(f"/auctions/{aid}/bids", headers=w, json={"amount": 200}).status_code == 201
+
+    mine = client.get("/bets", headers=p1).json()
+    # seulement mon pari, pas ceux des autres
+    assert [(b["prediction"], b["payout"]) for b in mine] == [(150, None)]
+    clock.advance(timedelta(minutes=60))
+    client.get(f"/auctions/{aid}", headers=w)  # règlement paresseux
+    # écarts : p1 = 50, p2 = 100 -> 70 / 30 de la cagnotte (20) : 14 et 6
+    assert client.get("/bets", headers=p1).json()[0]["payout"] == 14
+    assert client.get("/bets", headers=p2).json()[0]["payout"] == 6
+    assert client.get("/bets").status_code == 401
