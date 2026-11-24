@@ -1,7 +1,7 @@
 # Étape A01 : configuration d'essai
 
 - **Statut** : ✅ terminé le 2026-11-24
-- **Branche** : `a01-config-essai` · **PR** : à renseigner
+- **Branche** : `a01-config-essai` · **PR** : #10
 
 ## 1. Résumé fonctionnel
 On peut lancer le jeu en « mode essai » : les enchères durent 1, 2, 5, 10 ou 30 minutes (au lieu de 30 minutes à 12 heures) et un booster arrive chaque minute (au lieu de chaque heure). Toutes les autres règles (pourcentages, plafonds, monnaie de départ) sont identiques, donc on teste les vraies règles, seulement plus vite.

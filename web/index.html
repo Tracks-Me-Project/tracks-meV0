@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tracks</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>tracks</h1>
+
+    <!-- Écran 1 : pas de joueur dans cet onglet -->
+    <section id="login" hidden>
+      <form id="login-form">
+        <label for="name">Choisis un pseudo</label>
+        <input id="name" maxlength="50" required autocomplete="off">
+        <button type="submit">Jouer</button>
+      </form>
+    </section>
+
+    <!-- Écran 2 : joueur connecté -->
+    <section id="home" hidden>
+      <h2 id="player-name"></h2>
+      <dl>
+        <dt>Disponible</dt><dd id="available"></dd>
+        <dt>Bloqué</dt><dd id="locked"></dd>
+      </dl>
+      <button id="logout" type="button" class="secondary">Changer de joueur</button>
+    </section>
+
+    <p id="message" role="alert"></p>
+    <footer>Règles : <span id="rules-file">…</span></footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
