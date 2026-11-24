@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from tracks import auctions, bets, ledger
 from tracks.api.accounts import current_account
-from tracks.api.boosters import get_clock
+from tracks.api.deps import MAX_INT, Amount, AuctionId, Mbid, Offset, get_clock
 from tracks.clock import Clock
 from tracks.config import get_rules
 from tracks.db import get_session
@@ -31,17 +31,17 @@ def _error(exc: Exception) -> HTTPException:
 
 
 class NewAuction(BaseModel):
-    recording_mbid: str
-    start_price: int = Field(gt=0)
-    duration_minutes: int
+    recording_mbid: Mbid
+    start_price: Amount
+    duration_minutes: int = Field(gt=0, le=MAX_INT)
 
 
 class NewBet(BaseModel):
-    prediction: int = Field(gt=0)
+    prediction: Amount
 
 
 class NewBid(BaseModel):
-    amount: int = Field(gt=0)
+    amount: Amount
 
 
 def _view(session: Session, a: Auction) -> dict:
@@ -91,7 +91,7 @@ def list_open(
     session: Annotated[Session, Depends(get_session)],
     clock: Annotated[Clock, Depends(get_clock)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Offset = 0,
 ) -> list[dict]:
     rows = session.scalars(
         select(Auction)
@@ -105,7 +105,7 @@ def list_open(
 
 @router.get("/auctions/{auction_id}")
 def get_one(
-    auction_id: int,
+    auction_id: AuctionId,
     _: Annotated[Account, Depends(current_account)],
     session: Annotated[Session, Depends(get_session)],
     clock: Annotated[Clock, Depends(get_clock)],
@@ -119,7 +119,7 @@ def get_one(
 
 @router.post("/auctions/{auction_id}/bids", status_code=201)
 def bid(
-    auction_id: int,
+    auction_id: AuctionId,
     body: NewBid,
     account: Annotated[Account, Depends(current_account)],
     session: Annotated[Session, Depends(get_session)],
@@ -134,7 +134,7 @@ def bid(
 
 @router.post("/auctions/{auction_id}/cancel")
 def cancel(
-    auction_id: int,
+    auction_id: AuctionId,
     account: Annotated[Account, Depends(current_account)],
     session: Annotated[Session, Depends(get_session)],
     clock: Annotated[Clock, Depends(get_clock)],
@@ -148,7 +148,7 @@ def cancel(
 
 @router.post("/auctions/{auction_id}/bets", status_code=201)
 def place_bet(
-    auction_id: int,
+    auction_id: AuctionId,
     body: NewBet,
     account: Annotated[Account, Depends(current_account)],
     session: Annotated[Session, Depends(get_session)],
@@ -166,7 +166,7 @@ def my_bets(
     account: Annotated[Account, Depends(current_account)],
     session: Annotated[Session, Depends(get_session)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    offset: Offset = 0,
 ) -> list[dict]:
     """Seulement mes paris : les pronostics des autres restent cachés."""
     rows = session.execute(

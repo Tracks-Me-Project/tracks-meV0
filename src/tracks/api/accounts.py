@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from tracks import accounts
+from tracks.api.deps import get_clock
+from tracks.clock import Clock
 from tracks.db import get_session
 from tracks.models import Account
 
@@ -14,7 +16,7 @@ bearer = HTTPBearer(auto_error=False)
 
 
 class NewAccount(BaseModel):
-    name: str = Field(min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=50, pattern=r"^[^\x00]+$")
 
 
 def current_account(
@@ -28,9 +30,13 @@ def current_account(
 
 
 @router.post("/accounts", status_code=201)
-def create(body: NewAccount, session: Annotated[Session, Depends(get_session)]) -> dict:
+def create(
+    body: NewAccount,
+    session: Annotated[Session, Depends(get_session)],
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> dict:
     try:
-        account, token = accounts.create_account(session, body.name)
+        account, token = accounts.create_account(session, body.name, clock)
     except accounts.NameTaken:
         raise HTTPException(status_code=409, detail="nom déjà pris") from None
     return {"id": account.id, "name": account.name, "token": token}
