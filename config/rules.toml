@@ -1,0 +1,26 @@
+# Règles du jeu : seule source des valeurs. Ne rien écrire en dur dans le code.
+# Monnaie : entiers. Pourcentages : entiers (10 = 10 %).
+
+[auction]
+durations_minutes = [30, 60, 180, 360, 720]
+min_raise_percent = 5
+max_open_per_account = 5
+cancel_window_percent = 50      # le vendeur peut annuler pendant cette part de la durée
+
+[bet]
+stake_percent_of_start_price = 10
+max_open_per_account = 3
+close_at_percent_of_duration = 50
+podium_share_percent = 80       # part de la cagnotte pour le podium
+podium_split_percent = [50, 30, 20]
+two_bettors_split_percent = [70, 30]
+payout_cap_multiple = 4         # gain maximal = 4 x la mise
+
+[booster]
+tracks_per_booster = 5
+minutes_per_booster = 60
+max_stock = 10
+
+[recycling]
+coins_per_track = 1
+daily_cap = 50                  # non décidé : valeur par défaut
