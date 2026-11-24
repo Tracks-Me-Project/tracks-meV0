@@ -1,0 +1,33 @@
+# MODE ESSAI : mêmes règles que rules.toml, mais durées courtes pour tester à la main.
+# Lancement : TRACKS_RULES_PATH=config/rules.essai.toml uvicorn tracks.main:app --port 8001
+# Règles du jeu : seule source des valeurs. Ne rien écrire en dur dans le code.
+# Monnaie : entiers. Pourcentages : entiers (10 = 10 %).
+
+[account]
+starting_coins = 1000        # monnaie reçue à la création du compte
+
+[auction]
+durations_minutes = [1, 2, 5, 10, 30]  # normal : 30, 60, 180, 360, 720
+min_raise_percent = 5
+max_open_per_account = 5
+cancel_window_percent = 50      # le vendeur peut annuler pendant cette part de la durée
+min_start_price = 10            # pour que la mise d'un pari (10 %) soit au moins 1
+settle_interval_seconds = 2     # fréquence de la boucle qui règle les enchères échues
+
+[bet]
+stake_percent_of_start_price = 10
+max_open_per_account = 3
+close_at_percent_of_duration = 50
+podium_share_percent = 80       # part de la cagnotte pour le podium
+podium_split_percent = [50, 30, 20]
+two_bettors_split_percent = [70, 30]
+payout_cap_multiple = 4         # gain maximal = 4 x la mise
+
+[booster]
+tracks_per_booster = 5
+minutes_per_booster = 1         # normal : 60
+max_stock = 10
+
+[recycling]
+coins_per_track = 1
+daily_cap = 50                  # non décidé : valeur par défaut

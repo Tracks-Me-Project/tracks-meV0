@@ -14,7 +14,7 @@ Terminé et fusionné (PR #1 à #7) : squelette, comptes et journal de monnaie, 
 
 | N° | Étape | Livrable visible | Statut | Fiche | PR |
 |---|---|---|---|---|---|
-| A01 | Configuration de test | Durées d'enchères courtes en mode test | ⬜ | | |
+| A01 | Configuration de test | Durées d'enchères courtes en mode test | ✅ | [A01](etapes/A01_config_essai.md) | |
 | A02 | Socle front | Page mobile, créer un joueur, voir son solde | ⬜ | | |
 | A03 | Boosters | Voir son stock, ouvrir un booster | ⬜ | | |
 | A04 | Collection et recyclage | Liste des titres, recycler un doublon | ⬜ | | |
