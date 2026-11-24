@@ -5,12 +5,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from tracks import auctions, ledger
+from tracks import auctions, bets, ledger
 from tracks.api.accounts import current_account
 from tracks.api.boosters import get_clock
 from tracks.clock import Clock
+from tracks.config import get_rules
 from tracks.db import get_session
-from tracks.models import Account, Auction, Bid, Track
+from tracks.models import Account, Auction, Bet, Bid, Track
 
 router = APIRouter()
 
@@ -35,6 +36,10 @@ class NewAuction(BaseModel):
     duration_minutes: int
 
 
+class NewBet(BaseModel):
+    prediction: int = Field(gt=0)
+
+
 class NewBid(BaseModel):
     amount: int = Field(gt=0)
 
@@ -55,6 +60,9 @@ def _view(session: Session, a: Auction) -> dict:
         "min_next_bid": auctions.min_next_bid(a.start_price, top.amount if top else None),
         "bid_count": count,
         "ends_at": a.ends_at,
+        "bet_stake": bets.stake_for(a.start_price),
+        "bets_close_at": a.starts_at
+        + (a.ends_at - a.starts_at) * get_rules().bet.close_at_percent_of_duration // 100,
         "status": a.status,
         "winner_id": a.winner_id,
         "final_price": a.final_price,
@@ -136,3 +144,47 @@ def cancel(
     except auctions.AuctionError as exc:
         raise _error(exc) from None
     return _view(session, session.get(Auction, auction_id))
+
+
+@router.post("/auctions/{auction_id}/bets", status_code=201)
+def place_bet(
+    auction_id: int,
+    body: NewBet,
+    account: Annotated[Account, Depends(current_account)],
+    session: Annotated[Session, Depends(get_session)],
+    clock: Annotated[Clock, Depends(get_clock)],
+) -> dict:
+    try:
+        bet = auctions.place_bet(session, auction_id, account.id, body.prediction, clock)
+    except (auctions.AuctionError, ledger.InsufficientFunds) as exc:
+        raise _error(exc) from None
+    return {"auction_id": bet.auction_id, "prediction": bet.prediction, "stake": bet.stake}
+
+
+@router.get("/bets")
+def my_bets(
+    account: Annotated[Account, Depends(current_account)],
+    session: Annotated[Session, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[dict]:
+    """Seulement mes paris : les pronostics des autres restent cachés."""
+    rows = session.execute(
+        select(Bet, Auction)
+        .join(Auction, Auction.id == Bet.auction_id)
+        .where(Bet.account_id == account.id)
+        .order_by(Bet.created_at.desc(), Bet.auction_id)
+        .limit(limit)
+        .offset(offset)
+    )
+    return [
+        {
+            "auction_id": b.auction_id,
+            "prediction": b.prediction,
+            "stake": b.stake,
+            "auction_status": a.status,
+            "final_price": a.final_price,
+            "payout": b.payout,
+        }
+        for b, a in rows
+    ]

@@ -26,3 +26,11 @@ def test_unknown_key_rejected(tmp_path: Path):
     p.write_text(Path("config/rules.toml").read_text() + "\n[bet2]\nx = 1\n")
     with pytest.raises(ValidationError):
         load_rules(p)
+
+
+def test_split_must_have_right_size(tmp_path: Path):
+    bad = Path("config/rules.toml").read_text().replace("[70, 30]", "[50, 30, 20]")
+    p = tmp_path / "rules.toml"
+    p.write_text(bad)
+    with pytest.raises(ValidationError):
+        load_rules(p)

@@ -5,10 +5,10 @@ from datetime import timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from tracks import collection, ledger
+from tracks import bets, collection, ledger
 from tracks.clock import Clock
 from tracks.config import get_rules
-from tracks.models import Auction, Bid
+from tracks.models import Auction, Bet, Bid
 
 
 class AuctionError(Exception):
@@ -51,6 +51,39 @@ class AlreadyTopBidder(AuctionError):
 class BidTooLow(AuctionError):
     def __init__(self, minimum: int) -> None:
         self.minimum = minimum
+
+
+class HasBids(AuctionError):
+    pass
+
+
+class BetsClosed(AuctionError):
+    pass
+
+
+class BetOnOwnAuction(AuctionError):
+    pass
+
+
+class BidderCannotBet(AuctionError):
+    pass
+
+
+class BettorCannotBid(AuctionError):
+    pass
+
+
+class AlreadyBet(AuctionError):
+    pass
+
+
+class PredictionTooLow(AuctionError):
+    def __init__(self, minimum: int) -> None:
+        self.minimum = minimum
+
+
+class TooManyOpenBets(AuctionError):
+    pass
 
 
 class NotSeller(AuctionError):
@@ -134,6 +167,8 @@ def place_bid(
         raise AuctionClosed
     if bidder_id == auction.seller_id:
         raise OwnAuction
+    if session.get(Bet, (auction_id, bidder_id)):
+        raise BettorCannotBid
     top = top_bid(session, auction_id)
     if top and top.bidder_id == bidder_id:
         raise AlreadyTopBidder
@@ -153,7 +188,8 @@ def place_bid(
 
 
 def cancel(session: Session, auction_id: int, seller_id: int, clock: Clock) -> None:
-    """Le vendeur annule pendant la première moitié de la durée, même s'il y a des mises."""
+    """Le vendeur annule pendant la première moitié de la durée, tant qu'il n'y a pas de mise.
+    Les mises des paris sont rendues."""
     auction = _lock_auction(session, auction_id)
     if auction.seller_id != seller_id:
         raise NotSeller
@@ -162,29 +198,35 @@ def cancel(session: Session, auction_id: int, seller_id: int, clock: Clock) -> N
     window = (auction.ends_at - auction.starts_at) * get_rules().auction.cancel_window_percent
     if clock.now() >= auction.starts_at + window // 100:
         raise CancelWindowPassed
-    top = top_bid(session, auction_id)
-    if top:
-        ledger.lock_accounts(session, top.bidder_id)
-        ledger.unlock(session, top.bidder_id, top.amount, f"auction:{auction_id}")
+    if top_bid(session, auction_id):
+        raise HasBids
+    ledger.lock_accounts(session, *bets.bettor_ids(session, auction_id))
+    bets.refund_bets(session, auction_id)
     collection.add_copies(session, seller_id, auction.recording_mbid, 1)
     auction.status = "cancelled"
 
 
 def settle_one(session: Session, auction_id: int, clock: Clock) -> bool:
-    """Règle l'enchère si elle est ouverte et échue. Renvoie True si elle vient d'être réglée."""
+    """Règle l'enchère (et ses paris) si elle est ouverte et échue. True si elle vient d'être
+    réglée."""
     auction = _lock_auction(session, auction_id)
     if auction.status != "open" or clock.now() < auction.ends_at:
         return False
     top = top_bid(session, auction_id)
+    bettors = bets.bettor_ids(session, auction_id)
     if top is None:
+        ledger.lock_accounts(session, *bettors)
+        bets.refund_bets(session, auction_id)
         collection.add_copies(session, auction.seller_id, auction.recording_mbid, 1)
         auction.status = "unsold"
         return True
     ref = f"auction:{auction_id}"
-    ledger.lock_accounts(session, auction.seller_id, top.bidder_id)
+    # Tous les comptes d'un coup, dans l'ordre : pas de blocage entre deux règlements.
+    ledger.lock_accounts(session, auction.seller_id, top.bidder_id, *bettors)
     ledger.spend_locked(session, top.bidder_id, top.amount, ref)
     ledger.credit(session, auction.seller_id, top.amount, "sale", ref)  # aucune commission
     collection.add_copies(session, top.bidder_id, auction.recording_mbid, 1)
+    bets.settle_bets(session, auction_id, top.amount)
     auction.status = "sold"
     auction.winner_id = top.bidder_id
     auction.final_price = top.amount
@@ -203,3 +245,50 @@ def settle_due(session: Session, clock: Clock) -> int:
         settled += settle_one(session, auction_id, clock)
         session.commit()
     return settled
+
+
+def place_bet(
+    session: Session, auction_id: int, account_id: int, prediction: int, clock: Clock
+) -> Bet:
+    """Pari sur le prix final : mise fixe bloquée, un seul pari par enchère."""
+    rules = get_rules().bet
+    now = clock.now()
+    auction = _lock_auction(session, auction_id)
+    if auction.status != "open" or now >= auction.ends_at:
+        raise AuctionClosed
+    duration = auction.ends_at - auction.starts_at
+    if now >= auction.starts_at + duration * rules.close_at_percent_of_duration // 100:
+        raise BetsClosed
+    if account_id == auction.seller_id:
+        raise BetOnOwnAuction
+    if session.scalar(
+        select(Bid.id).where(Bid.auction_id == auction_id, Bid.bidder_id == account_id).limit(1)
+    ):
+        raise BidderCannotBet
+    if session.get(Bet, (auction_id, account_id)):
+        raise AlreadyBet
+    top = top_bid(session, auction_id)
+    current = top.amount if top else auction.start_price
+    if prediction < current:
+        raise PredictionTooLow(current)
+    ledger.lock_accounts(session, account_id)  # sérialise les paris d'un même joueur
+    open_bets = session.scalar(
+        select(func.count())
+        .select_from(Bet)
+        .join(Auction, Auction.id == Bet.auction_id)
+        .where(Bet.account_id == account_id, Auction.status == "open", Auction.ends_at > now)
+    )
+    if open_bets >= rules.max_open_per_account:
+        raise TooManyOpenBets
+    stake = bets.stake_for(auction.start_price)
+    ledger.lock(session, account_id, stake, f"bet:auction:{auction_id}")
+    bet = Bet(
+        auction_id=auction_id,
+        account_id=account_id,
+        prediction=prediction,
+        stake=stake,
+        created_at=now,
+    )
+    session.add(bet)
+    session.flush()
+    return bet

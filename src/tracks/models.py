@@ -102,3 +102,20 @@ class Bid(Base):
     bidder_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
     amount: Mapped[int]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class Bet(Base):
+    """Pari sur le prix final. Un seul par joueur et par enchère."""
+
+    __tablename__ = "bets"
+    __table_args__ = (
+        CheckConstraint("prediction > 0", name="prediction_positive"),
+        CheckConstraint("stake > 0", name="stake_positive"),
+    )
+
+    auction_id: Mapped[int] = mapped_column(ForeignKey("auctions.id"), primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), primary_key=True, index=True)
+    prediction: Mapped[int]
+    stake: Mapped[int]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    payout: Mapped[int | None]  # vide tant que le pari n'est pas réglé

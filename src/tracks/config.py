@@ -38,10 +38,10 @@ class BetRules(_Frozen):
     payout_cap_multiple: int
 
     @model_validator(mode="after")
-    def _splits_sum_to_100(self) -> "BetRules":
-        for split in (self.podium_split_percent, self.two_bettors_split_percent):
-            if sum(split) != 100:
-                raise ValueError(f"une répartition doit totaliser 100 : {split}")
+    def _splits_valid(self) -> "BetRules":
+        for split, size in ((self.podium_split_percent, 3), (self.two_bettors_split_percent, 2)):
+            if len(split) != size or sum(split) != 100:
+                raise ValueError(f"attendu : {size} parts totalisant 100, reçu {split}")
         return self
 
 
