@@ -63,5 +63,7 @@ Le catalogue (MusicBrainz) n'est **pas versionné** sans mon accord (licence). �
   - `alembic upgrade head && python -m tracks.catalogue data/catalogue.essai.csv`
   - `uvicorn tracks.main:app --port 8001`
 - Interface : http://localhost:8001/app/ (jeton gardé par onglet : un onglet = un joueur).
+- Joueurs virtuels sur le serveur en cours : `python -m tracks.simulation.live --bots 5 --every 5` ; contrôle des comptes :
+  `python -m tracks.simulation.checks` (mêmes variables d'environnement que le serveur). Mode d'emploi : `docs/guide_test_alpha.md`.
 - Simulation : `python -m tracks.simulation.run --bots 20 --days 3 --seed 1` (base `tracks_sim`,
   vidée à chaque lancement ; dure environ 3 minutes).
