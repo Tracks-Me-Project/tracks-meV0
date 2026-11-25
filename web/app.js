@@ -1,18 +1,26 @@
 // Jeton gardé par onglet (sessionStorage) : deux onglets = deux joueurs.
 const $ = (id) => document.getElementById(id);
-const message = (text = "") => { $("message").textContent = text; };
+const message = (text = "", ok = false) => {
+  $("message").textContent = text;
+  $("message").classList.toggle("ok", ok);
+};
 
 async function api(path, options = {}) {
   const token = sessionStorage.getItem("token");
   const headers = { "Content-Type": "application/json", ...(token && { Authorization: `Bearer ${token}` }) };
   const res = await fetch(path, { ...options, headers });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(body.detail || "erreur"), { status: res.status });
+  if (!res.ok) {
+    // detail : texte, objet {error, ...} (refus du jeu) ou liste (saisie invalide)
+    const { detail } = body;
+    const text = typeof detail === "string" ? detail : detail?.error || "erreur";
+    throw Object.assign(new Error(text), { status: res.status, detail });
+  }
   return body;
 }
 
 function show(screen) {
-  for (const id of ["login", "home", "boosters"]) $(id).hidden = id !== screen;
+  for (const id of ["login", "home", "boosters", "collection"]) $(id).hidden = id !== screen;
   $("nav").hidden = screen === "login";
   for (const link of $("nav").children) {
     link.toggleAttribute("aria-current", link.hash === `#${screen}`);
@@ -22,7 +30,9 @@ function show(screen) {
 function logout() {
   sessionStorage.removeItem("token");
   clearTimeout(timer);
-  $("drawn").replaceChildren(); // le tirage du joueur précédent
+  $("drawn").replaceChildren(); // le tirage et la collection du joueur précédent
+  $("cards").replaceChildren();
+  $("search").value = "";
   show("login");
 }
 
@@ -33,6 +43,7 @@ async function refresh() {
   if (!sessionStorage.getItem("token")) return show("login");
   try {
     if (location.hash === "#boosters") await showBoosters();
+    else if (location.hash === "#collection") await showCollection();
     else await showHome();
   } catch (err) {
     fail(err);
@@ -74,19 +85,92 @@ function countdown(seconds) {
   }, 1000);
 }
 
-// Une ligne par titre, « ×2 » pour un doublon dans le même booster. textContent : jamais de HTML.
+// Titre (« ×2 » si plusieurs) puis artiste · album · année. textContent : jamais de HTML.
+function trackItem(t, n) {
+  const item = document.createElement("li");
+  const name = document.createElement("span");
+  const detail = document.createElement("small");
+  name.textContent = n > 1 ? `${t.title} ×${n}` : t.title;
+  detail.textContent = [t.artist, t.album, t.year].filter(Boolean).join(" · ");
+  item.append(name, detail);
+  return item;
+}
+
+// Une ligne par titre, « ×2 » pour un doublon dans le même booster.
 function showDrawn(tracks) {
   const counts = new Map();
   for (const t of tracks) counts.set(t.id, { ...t, n: (counts.get(t.id)?.n ?? 0) + 1 });
-  $("drawn").replaceChildren(...[...counts.values()].map((t) => {
-    const item = document.createElement("li");
-    const detail = document.createElement("small");
-    item.textContent = t.n > 1 ? `${t.title} ×${t.n}` : t.title;
-    detail.textContent = [t.artist, t.album, t.year].filter(Boolean).join(" · ");
-    item.append(detail);
-    return item;
-  }));
+  $("drawn").replaceChildren(...[...counts.values()].map((t) => trackItem(t, t.n)));
 }
+
+const PAGE = 50;
+const rules = api("/rules").then((r) => { $("rules-file").textContent = r.file; return r.rules; });
+rules.catch(() => {});
+let loadId = 0; // une réponse en retard (frappe suivante) est ignorée
+
+async function showCollection() {
+  show("collection");
+  await loadCards(false);
+}
+
+async function loadCards(append) {
+  const id = ++loadId;
+  const q = $("search").value.trim();
+  const offset = append ? $("cards").children.length : 0;
+  const coins = (await rules).recycling.coins_per_track;
+  // un de plus que la page : dit s'il reste quelque chose à afficher
+  const rows = await api(`/collection?${new URLSearchParams({ q, limit: PAGE + 1, offset })}`);
+  if (id !== loadId) return;
+  const items = rows.slice(0, PAGE).map((t) => card(t, coins));
+  if (append) $("cards").append(...items);
+  else $("cards").replaceChildren(...items);
+  $("more").hidden = rows.length <= PAGE;
+  $("empty").hidden = $("cards").children.length > 0;
+  $("empty").textContent = q ? "Aucun titre ne correspond." : "Collection vide : ouvre un booster.";
+}
+
+function card(track, coins) {
+  const item = trackItem(track, track.quantity);
+  const duplicates = track.quantity - 1; // le dernier exemplaire ne se recycle pas
+  const add = (label, n) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary";
+    button.textContent = `${label} (+${n * coins})`;
+    button.addEventListener("click", () => recycleCard(item, track, n, coins));
+    item.append(button);
+  };
+  if (duplicates >= 1) add("Recycler 1", 1);
+  if (duplicates >= 2) add(`Recycler les ${duplicates} doublons`, duplicates);
+  return item;
+}
+
+async function recycleCard(item, track, n, coins) {
+  const question = `Recycler ${n} exemplaire(s) de « ${track.title} » pour ${n * coins} pièce(s) ?`;
+  if (!confirm(`${question}\nAction définitive.`)) return;
+  const buttons = item.querySelectorAll("button");
+  buttons.forEach((b) => { b.disabled = true; }); // pas de double appui
+  message();
+  try {
+    const body = JSON.stringify({ recording_mbid: track.id, quantity: n });
+    const done = await api("/collection/recycle", { method: "POST", body });
+    item.replaceWith(card({ ...track, quantity: track.quantity - done.recycled }, coins));
+    message(`+${done.coins} pièce(s). Plafond restant aujourd'hui : ${done.remaining_cap_today}.`, true);
+  } catch (err) {
+    buttons.forEach((b) => { b.disabled = false; });
+    const d = err.detail;
+    if (d?.remaining !== undefined) message(`Plafond quotidien : il reste ${d.remaining} pièce(s).`);
+    else if (d?.available !== undefined) message(`Seulement ${d.available} doublon(s) disponible(s).`);
+    else fail(err);
+  }
+}
+
+let typing; // courte pause dans la frappe avant d'interroger le serveur
+$("search").addEventListener("input", () => {
+  clearTimeout(typing);
+  typing = setTimeout(() => { message(); loadCards(false).catch(fail); }, 300);
+});
+$("more").addEventListener("click", () => loadCards(true).catch(fail));
 
 $("open-booster").addEventListener("click", async () => {
   $("open-booster").disabled = true; // pas de double appui
@@ -121,5 +205,4 @@ $("logout").addEventListener("click", () => {
   logout();
 });
 
-api("/rules").then((r) => { $("rules-file").textContent = r.file; }).catch(() => {});
 refresh();

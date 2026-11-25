@@ -9,7 +9,9 @@ button.secondary { background: #dfe1e8; color: #1b1b1f; }
 dl { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 dt, dd { margin: 0; }
 dd { font-weight: 600; }
-#message { color: #c92a2a; min-height: 1.4em; }
+/* collé au-dessus de la barre : visible même au milieu d'une longue liste */
+#message { color: #c92a2a; min-height: 1.4em; position: sticky; bottom: 56px; background: #f4f4f6; }
+#message.ok { color: #2b8a3e; }
 footer { margin-top: 24px; font-size: 0.85rem; color: #666; }
 button:disabled { opacity: 0.5; }
 ul { list-style: none; padding: 0; }

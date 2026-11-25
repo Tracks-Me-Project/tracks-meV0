@@ -1,4 +1,4 @@
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -32,9 +32,10 @@ def take_copy(session: Session, account_id: int, recording_mbid: str) -> bool:
 
 
 def list_collection(
-    session: Session, account_id: int, limit: int, offset: int
+    session: Session, account_id: int, limit: int, offset: int, query: str = ""
 ) -> list[tuple[Track, int]]:
-    rows = session.execute(
+    """query : cherché dans titre, artiste ou album (casse ignorée, pas les accents)."""
+    stmt = (
         select(Track, CollectionItem.quantity)
         .join(CollectionItem, CollectionItem.recording_mbid == Track.recording_mbid)
         .where(CollectionItem.account_id == account_id)
@@ -42,4 +43,9 @@ def list_collection(
         .limit(limit)
         .offset(offset)
     )
+    if query:
+        # autoescape : « % » et « _ » saisis par le joueur sont du texte, pas des jokers
+        columns = (Track.title, Track.artist, Track.album)
+        stmt = stmt.where(or_(*(c.icontains(query, autoescape=True) for c in columns)))
+    rows = session.execute(stmt)
     return [(t, q) for t, q in rows]

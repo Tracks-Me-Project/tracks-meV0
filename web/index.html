@@ -28,6 +28,16 @@
       <ul id="drawn"></ul>
     </section>
 
+    <!-- Écran Collection -->
+    <section id="collection" hidden>
+      <h2>Collection</h2>
+      <input id="search" type="search" maxlength="100" aria-label="Rechercher"
+             placeholder="Rechercher : titre, artiste, album">
+      <p id="empty" hidden></p>
+      <ul id="cards"></ul>
+      <button id="more" type="button" class="secondary" hidden>Afficher plus</button>
+    </section>
+
     <!-- Écran 2 : joueur connecté -->
     <section id="home" hidden>
       <h2 id="player-name"></h2>
@@ -44,6 +54,7 @@
   <nav id="nav" hidden>
     <a href="#home">Accueil</a>
     <a href="#boosters">Boosters</a>
+    <a href="#collection">Collection</a>
   </nav>
   <script src="app.js"></script>
 </body>

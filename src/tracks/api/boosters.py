@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from tracks import boosters, collection
 from tracks.api.accounts import current_account
-from tracks.api.deps import DbSession, Offset, get_clock
+from tracks.api.deps import DbSession, Offset, SearchText, get_clock
 from tracks.clock import Clock
 from tracks.config import get_rules
 from tracks.models import Account, Track
@@ -64,6 +64,7 @@ def my_collection(
     session: DbSession,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Offset = 0,
+    q: SearchText = "",
 ) -> list[dict]:
-    rows = collection.list_collection(session, account.id, limit, offset)
+    rows = collection.list_collection(session, account.id, limit, offset, q)
     return [{**_track(t), "quantity": q} for t, q in rows]
