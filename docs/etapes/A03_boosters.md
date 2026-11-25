@@ -1,7 +1,7 @@
 # Étape A03 : boosters
 
 - **Statut** : ✅ terminé le 2026-11-25
-- **Branche** : `a03-boosters` · **PR** : voir feuille de route
+- **Branche** : `a03-boosters` · **PR** : #13
 
 ## 1. Résumé fonctionnel
 Un onglet « Boosters » (barre en bas de l'écran) montre le stock et le temps avant le prochain booster. On ouvre un booster et on voit les 5 titres reçus (titre, artiste, album, année) ; un titre sorti deux fois est marqué « ×2 ». Le bouton se grise quand le stock est vide.
