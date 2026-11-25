@@ -57,9 +57,23 @@ async function refresh() {
 
 function fail(err) {
   if (err.status === 401) return logout(); // jeton inconnu (base remise à zéro ?)
-  if (err.message === "AuctionNotFound") return message("Enchère introuvable.");
+  const refusal = REFUSALS[err.message];
+  if (refusal) return message(refusal(err.detail));
   message(err.status ? err.message : "Serveur injoignable");
 }
+
+// Refus du jeu (nom envoyé par le serveur) en clair.
+const REFUSALS = {
+  AuctionNotFound: () => "Enchère introuvable.",
+  AuctionClosed: () => "Cette enchère est terminée.",
+  NotOwned: () => "Tu ne possèdes plus ce titre.",
+  NotSeller: () => "Seul le vendeur peut annuler.",
+  InvalidDuration: () => "Durée non autorisée.",
+  StartPriceTooLow: (d) => `Prix de départ minimum : ${d.minimum}.`,
+  TooManyOpen: () => "Tu as déjà le maximum d'enchères ouvertes.",
+  CancelWindowPassed: () => "Le délai d'annulation est passé.",
+  HasBids: () => "Annulation impossible : quelqu'un a déjà misé.",
+};
 
 async function showHome() {
   const me = await api("/me");
@@ -189,8 +203,17 @@ async function showAuction(id) {
     status,
     list,
   );
+  const entries = open ? [{ el: status, label: "Fin dans", seconds: a.seconds_left }] : [];
+  if (a.seller_id === me.id && a.cancel_seconds_left > 0) {
+    const window = element("p", "");
+    const button = element("button", "Annuler la vente", "secondary");
+    button.type = "button";
+    button.addEventListener("click", () => cancelAuction(button, a));
+    $("auction-detail").append(window, button);
+    entries.push({ el: window, label: "Annulable encore", seconds: a.cancel_seconds_left });
+  }
   show("auction");
-  countdown(open ? [{ el: status, label: "Fin dans", seconds: a.seconds_left }] : [], () => showAuction(id));
+  countdown(entries, () => showAuction(id));
 }
 
 // Titre (« ×2 » si plusieurs) puis artiste · album · année. textContent : jamais de HTML.
@@ -225,11 +248,11 @@ async function loadCards(append) {
   const id = ++loadId;
   const q = $("search").value.trim();
   const offset = append ? $("cards").children.length : 0;
-  const coins = (await rules).recycling.coins_per_track;
+  const game = await rules;
   // un de plus que la page : dit s'il reste quelque chose à afficher
   const rows = await api(`/collection?${new URLSearchParams({ q, limit: PAGE + 1, offset })}`);
   if (id !== loadId) return;
-  const items = rows.slice(0, PAGE).map((t) => card(t, coins));
+  const items = rows.slice(0, PAGE).map((t) => card(t, game));
   if (append) $("cards").append(...items);
   else $("cards").replaceChildren(...items);
   $("more").hidden = rows.length <= PAGE;
@@ -237,7 +260,8 @@ async function loadCards(append) {
   $("empty").textContent = q ? "Aucun titre ne correspond." : "Collection vide : ouvre un booster.";
 }
 
-function card(track, coins) {
+function card(track, game) {
+  const coins = game.recycling.coins_per_track;
   const item = trackItem(track, track.quantity);
   const duplicates = track.quantity - 1; // le dernier exemplaire ne se recycle pas
   const add = (label, n) => {
@@ -245,15 +269,56 @@ function card(track, coins) {
     button.type = "button";
     button.className = "secondary";
     button.textContent = `${label} (+${n * coins})`;
-    button.addEventListener("click", () => recycleCard(item, track, n, coins));
+    button.addEventListener("click", () => recycleCard(item, track, n, game));
     item.append(button);
   };
   if (duplicates >= 1) add("Recycler 1", 1);
   if (duplicates >= 2) add(`Recycler les ${duplicates} doublons`, duplicates);
+  item.append(sellForm(track, game.auction));
   return item;
 }
 
-async function recycleCard(item, track, n, coins) {
+// Volet natif <details> : prix et durées viennent des règles, le serveur reste seul juge.
+function sellForm(track, { min_start_price: min, durations_minutes: durations }) {
+  const box = document.createElement("details");
+  const form = document.createElement("form");
+  const price = document.createElement("input");
+  Object.assign(price, { type: "number", inputMode: "numeric", min, step: 1, value: min, required: true });
+  const duration = document.createElement("select");
+  duration.append(...durations.map((m) => new Option(m < 60 ? `${m} min` : `${m / 60} h`, m)));
+  const priceLabel = element("label", `Prix de départ (minimum ${min})`);
+  priceLabel.append(price);
+  const durationLabel = element("label", "Durée");
+  durationLabel.append(duration);
+  const submit = element("button", "Vendre");
+  form.append(priceLabel, durationLabel, submit);
+  box.append(element("summary", "Mettre aux enchères"), form);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const last = track.quantity === 1 ? "\nC'est ton dernier exemplaire." : "";
+    const when = duration.selectedOptions[0].text;
+    if (!confirm(`Vendre « ${track.title} » à partir de ${price.value}, pendant ${when} ?${last}`)) return;
+    submit.disabled = true; // pas de double appui
+    message();
+    try {
+      const body = JSON.stringify({
+        recording_mbid: track.id,
+        start_price: Number(price.value),
+        duration_minutes: Number(duration.value),
+      });
+      const auction = await api("/auctions", { method: "POST", body });
+      location.hash = `#auction/${auction.id}`;
+    } catch (err) {
+      submit.disabled = false;
+      fail(err);
+    }
+  });
+  return box;
+}
+
+async function recycleCard(item, track, n, game) {
+  const coins = game.recycling.coins_per_track;
   const question = `Recycler ${n} exemplaire(s) de « ${track.title} » pour ${n * coins} pièce(s) ?`;
   if (!confirm(`${question}\nAction définitive.`)) return;
   const buttons = item.querySelectorAll("button");
@@ -262,7 +327,7 @@ async function recycleCard(item, track, n, coins) {
   try {
     const body = JSON.stringify({ recording_mbid: track.id, quantity: n });
     const done = await api("/collection/recycle", { method: "POST", body });
-    item.replaceWith(card({ ...track, quantity: track.quantity - done.recycled }, coins));
+    item.replaceWith(card({ ...track, quantity: track.quantity - done.recycled }, game));
     message(`+${done.coins} pièce(s). Plafond restant aujourd'hui : ${done.remaining_cap_today}.`, true);
   } catch (err) {
     buttons.forEach((b) => { b.disabled = false; });
@@ -291,6 +356,20 @@ $("open-booster").addEventListener("click", async () => {
     fail(err);
   }
 });
+
+async function cancelAuction(button, a) {
+  if (!confirm(`Annuler la vente de « ${a.title} » ? Le titre revient dans ta collection.`)) return;
+  button.disabled = true;
+  message();
+  try {
+    await api(`/auctions/${a.id}/cancel`, { method: "POST" });
+    await showAuction(a.id);
+    message("Vente annulée.", true);
+  } catch (err) {
+    await showAuction(a.id).catch(() => {}); // état à jour : mise reçue, délai passé…
+    fail(err);
+  }
+}
 
 window.addEventListener("hashchange", () => {
   $("auction-detail").replaceChildren();

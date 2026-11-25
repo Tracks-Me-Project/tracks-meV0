@@ -311,3 +311,9 @@ def test_same_player_bidding_on_two_auctions_cannot_overspend(engine, session, c
 
     assert _run_parallel([bid(a1), bid(a2)]) == ["InsufficientFunds", "ok"]
     assert _balances(session, x) == (400, 600)
+
+
+def test_cancel_deadline_is_half_the_duration(session, clock, world):
+    seller, *_ = world
+    auction = _sell(session, clock, seller)  # 60 min
+    assert auctions.cancel_deadline(auction) == T0 + timedelta(minutes=30)
