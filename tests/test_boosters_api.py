@@ -63,3 +63,11 @@ def test_recycle_api(client, auth, session):
     refused = recycle(1)
     assert refused.status_code == 409 and refused.json()["detail"]["available"] == 0
     assert recycle(0).status_code == 422
+
+
+def test_collection_search_param(client, auth):
+    client.post("/boosters/open", headers=auth)
+    assert client.get("/collection", params={"q": "introuvable"}, headers=auth).json() == []
+    assert client.get("/collection", params={"q": "T"}, headers=auth).json()
+    for bad in ("a\x00", "x" * 101):
+        assert client.get("/collection", params={"q": bad}, headers=auth).status_code == 422

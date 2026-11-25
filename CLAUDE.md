@@ -57,7 +57,11 @@ Le catalogue (MusicBrainz) n'est **pas versionné** sans mon accord (licence). �
 - Base : `docker compose up -d` (Postgres sur le port 5442), puis `alembic upgrade head`.
 - Tests : `ruff check . && pytest` (utilisent la base `tracks_test`, recréée à chaque session).
 - API : `uvicorn tracks.main:app --port 8001` (le 8000 est souvent pris).
-- API en mode essai (enchères de 1 à 30 min, 1 booster/min) : `TRACKS_RULES_PATH=config/rules.essai.toml uvicorn tracks.main:app --port 8001`.
+- Mode essai (enchères de 1 à 30 min, 1 booster/min, 100 titres pour avoir des doublons), base `tracks_essai` :
+  - une fois : `docker compose exec db createdb -U tracks tracks_essai && head -101 data/catalogue.csv > data/catalogue.essai.csv`
+  - `export TRACKS_DATABASE_URL=postgresql+psycopg://tracks:tracks@localhost:5442/tracks_essai TRACKS_RULES_PATH=config/rules.essai.toml`
+  - `alembic upgrade head && python -m tracks.catalogue data/catalogue.essai.csv`
+  - `uvicorn tracks.main:app --port 8001`
 - Interface : http://localhost:8001/app/ (jeton gardé par onglet : un onglet = un joueur).
 - Simulation : `python -m tracks.simulation.run --bots 20 --days 3 --seed 1` (base `tracks_sim`,
   vidée à chaque lancement ; dure environ 3 minutes).
