@@ -1,16 +1,22 @@
-"""Contrôles de cohérence, calculés directement dans la base. Renvoie la liste des anomalies."""
+"""Contrôles de cohérence, calculés directement dans la base. Renvoie la liste des anomalies.
 
-from datetime import datetime
+Après une partie à la main, serveur lancé : `python -m tracks.simulation.checks` (lecture seule,
+base désignée par TRACKS_DATABASE_URL)."""
+
+import sys
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
 from tracks.config import get_rules
+from tracks.db import get_engine
 
 
 def check_invariants(
-    engine: Engine, now: datetime, boosters_opened: int, injected_cards: int
+    engine: Engine, now: datetime, boosters_opened: int | None, injected_cards: int
 ) -> list[str]:
+    """boosters_opened=None (nombre inconnu après une partie réelle) : cartes non comptées."""
     rules = get_rules()
     problems: list[str] = []
     with Session(engine) as s:
@@ -55,16 +61,17 @@ def check_invariants(
         if total != expected:
             problems.append(f"monnaie totale {total} ≠ attendue {expected}")
 
-        cards = one("SELECT coalesce(sum(quantity), 0) FROM collection") + one(
-            "SELECT count(*) FROM auctions WHERE status = 'open'"
-        )
-        expected_cards = (
-            boosters_opened * rules.booster.tracks_per_booster
-            + injected_cards
-            - recycled // rules.recycling.coins_per_track
-        )
-        if cards != expected_cards:
-            problems.append(f"{cards} cartes comptées ≠ {expected_cards} attendues")
+        if boosters_opened is not None:
+            cards = one("SELECT coalesce(sum(quantity), 0) FROM collection") + one(
+                "SELECT count(*) FROM auctions WHERE status = 'open'"
+            )
+            expected_cards = (
+                boosters_opened * rules.booster.tracks_per_booster
+                + injected_cards
+                - recycled // rules.recycling.coins_per_track
+            )
+            if cards != expected_cards:
+                problems.append(f"{cards} cartes comptées ≠ {expected_cards} attendues")
 
         due = s.execute(
             text("SELECT count(*) FROM auctions WHERE status='open' AND ends_at <= :now"),
@@ -80,3 +87,20 @@ def check_invariants(
         if unsettled:
             problems.append(f"{unsettled} pari(s) dont l'état ne suit pas celui de l'enchère")
     return problems
+
+
+def main() -> int:
+    # Une seule photo de la base pour tous les contrôles : sinon une mise passée entre deux
+    # requêtes donnerait une fausse anomalie.
+    engine = get_engine().execution_options(
+        isolation_level="REPEATABLE READ", postgresql_readonly=True
+    )
+    # Marge : une enchère tout juste échue attend le prochain passage de la boucle de règlement.
+    margin = timedelta(seconds=get_rules().auction.settle_interval_seconds + 5)
+    problems = check_invariants(engine, datetime.now(UTC) - margin, None, 0)
+    print("\n".join(f"ÉCHEC : {p}" for p in problems) or "OK : soldes et enchères cohérents")
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
