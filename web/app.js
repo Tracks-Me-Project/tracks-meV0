@@ -73,6 +73,11 @@ const REFUSALS = {
   TooManyOpen: () => "Tu as déjà le maximum d'enchères ouvertes.",
   CancelWindowPassed: () => "Le délai d'annulation est passé.",
   HasBids: () => "Annulation impossible : quelqu'un a déjà misé.",
+  BidTooLow: (d) => `Mise trop basse : le minimum est maintenant ${d.minimum}.`,
+  InsufficientFunds: () => "Solde disponible insuffisant.",
+  AlreadyTopBidder: () => "Tu es déjà en tête.",
+  OwnAuction: () => "Tu ne peux pas miser sur ta propre enchère.",
+  BettorCannotBid: () => "Tu as parié sur cette enchère : tu ne peux pas y miser.",
 };
 
 async function showHome() {
@@ -211,6 +216,9 @@ async function showAuction(id) {
     button.addEventListener("click", () => cancelAuction(button, a));
     $("auction-detail").append(window, button);
     entries.push({ el: window, label: "Annulable encore", seconds: a.cancel_seconds_left });
+  }
+  if (open && a.seller_id !== me.id && a.leader_id !== me.id) {
+    $("auction-detail").append(bidForm(a, me.available));
   }
   show("auction");
   countdown(entries, () => showAuction(id));
@@ -356,6 +364,36 @@ $("open-booster").addEventListener("click", async () => {
     fail(err);
   }
 });
+
+// Le solde et le minimum affichés sont indicatifs : seul le serveur accepte ou refuse la mise.
+function bidForm(a, available) {
+  const form = document.createElement("form");
+  const amount = document.createElement("input");
+  const min = a.min_next_bid;
+  Object.assign(amount, { type: "number", inputMode: "numeric", min, step: 1, value: min, required: true });
+  const label = element("label", `Ta mise (minimum ${min}, disponible ${available})`);
+  label.append(amount);
+  const submit = element("button", "Miser");
+  form.append(label, submit);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const question = `Miser ${amount.value} sur « ${a.title} » ?`;
+    if (!confirm(`${question}\nLa somme est bloquée tant que tu mènes.`)) return;
+    submit.disabled = true; // pas de double appui
+    message();
+    try {
+      const body = JSON.stringify({ amount: Number(amount.value) });
+      await api(`/auctions/${a.id}/bids`, { method: "POST", body });
+      await showAuction(a.id);
+      message("Mise enregistrée.", true);
+    } catch (err) {
+      await showAuction(a.id).catch(() => {}); // état à jour : surenchère, fin…
+      fail(err);
+    }
+  });
+  return form;
+}
 
 async function cancelAuction(button, a) {
   if (!confirm(`Annuler la vente de « ${a.title} » ? Le titre revient dans ta collection.`)) return;
