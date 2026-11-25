@@ -14,6 +14,7 @@ def test_page_served():
     r = client.get("/app/")
     assert r.status_code == 200 and 'id="login-form"' in r.text
     assert 'id="open-booster"' in r.text and 'id="search"' in r.text
+    assert 'id="auction-list"' in r.text
     assert client.get("/app/app.js").status_code == 200
 
 

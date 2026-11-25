@@ -1,3 +1,4 @@
+import math
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -43,27 +44,40 @@ class NewBid(BaseModel):
     amount: Amount
 
 
-def _view(session: Session, a: Auction) -> dict:
-    # shortcut: 3 requêtes par enchère (liste limitée à 100), à regrouper si la liste devient lente.
+def _name(session: Session, account_id: int | None) -> str | None:
+    return None if account_id is None else session.get(Account, account_id).name
+
+
+def _view(session: Session, a: Auction, clock: Clock) -> dict:
+    # shortcut: jusqu'à 6 requêtes par enchère (100 au plus), à regrouper si la liste est lente.
     top = auctions.top_bid(session, a.id)
     track = session.get(Track, a.recording_mbid)
     count = session.scalar(select(func.count()).select_from(Bid).where(Bid.auction_id == a.id))
+    leader_id = top.bidder_id if top else None
+    left = (a.ends_at - clock.now()).total_seconds() if a.status == "open" else 0
     return {
         "id": a.id,
         "seller_id": a.seller_id,
+        "seller_name": _name(session, a.seller_id),
+        "leader_id": leader_id,
+        "leader_name": _name(session, leader_id),
         "recording_mbid": a.recording_mbid,
         "title": track.title,
         "artist": track.artist,
+        "album": track.album,
         "start_price": a.start_price,
         "current_price": top.amount if top else a.start_price,
         "min_next_bid": auctions.min_next_bid(a.start_price, top.amount if top else None),
         "bid_count": count,
         "ends_at": a.ends_at,
+        # calculé par le serveur : l'horloge du téléphone n'intervient pas. Arrondi au-dessus.
+        "seconds_left": max(0, math.ceil(left)),
         "bet_stake": bets.stake_for(a.start_price),
         "bets_close_at": a.starts_at
         + (a.ends_at - a.starts_at) * get_rules().bet.close_at_percent_of_duration // 100,
         "status": a.status,
         "winner_id": a.winner_id,
+        "winner_name": _name(session, a.winner_id),
         "final_price": a.final_price,
     }
 
@@ -81,7 +95,7 @@ def create(
         )
     except auctions.AuctionError as exc:
         raise _error(exc) from None
-    return _view(session, a)
+    return _view(session, a, clock)
 
 
 @router.get("/auctions")
@@ -99,7 +113,7 @@ def list_open(
         .limit(limit)
         .offset(offset)
     )
-    return [_view(session, a) for a in rows]
+    return [_view(session, a, clock) for a in rows]
 
 
 @router.get("/auctions/{auction_id}")
@@ -113,7 +127,7 @@ def get_one(
         auctions.settle_one(session, auction_id, clock)  # règlement paresseux à la lecture
     except auctions.AuctionError as exc:
         raise _error(exc) from None
-    return _view(session, session.get(Auction, auction_id))
+    return _view(session, session.get(Auction, auction_id), clock)
 
 
 @router.post("/auctions/{auction_id}/bids", status_code=201)
@@ -128,7 +142,7 @@ def bid(
         auctions.place_bid(session, auction_id, account.id, body.amount, clock)
     except (auctions.AuctionError, ledger.InsufficientFunds) as exc:
         raise _error(exc) from None
-    return _view(session, session.get(Auction, auction_id))
+    return _view(session, session.get(Auction, auction_id), clock)
 
 
 @router.post("/auctions/{auction_id}/cancel")
@@ -142,7 +156,7 @@ def cancel(
         auctions.cancel(session, auction_id, account.id, clock)
     except auctions.AuctionError as exc:
         raise _error(exc) from None
-    return _view(session, session.get(Auction, auction_id))
+    return _view(session, session.get(Auction, auction_id), clock)
 
 
 @router.post("/auctions/{auction_id}/bets", status_code=201)

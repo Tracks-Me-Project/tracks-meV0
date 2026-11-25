@@ -104,3 +104,22 @@ def test_bets_api_flow(client, session, clock):
     assert client.get("/bets", headers=p1).json()[0]["payout"] == 14
     assert client.get("/bets", headers=p2).json()[0]["payout"] == 6
     assert client.get("/bets").status_code == 401
+
+
+def test_view_names_and_time_left(client, session, clock):
+    seller, a = _player(client, session, "vendeur", 1), _player(client, session, "acheteur")
+    body = {"recording_mbid": "r1", "start_price": 100, "duration_minutes": 30}
+    view = client.post("/auctions", headers=seller, json=body).json()
+    assert (view["seller_name"], view["leader_id"], view["leader_name"]) == ("vendeur", None, None)
+    assert (view["album"], view["seconds_left"], view["winner_name"]) == ("A", 1800, None)
+
+    aid = view["id"]
+    view = client.post(f"/auctions/{aid}/bids", headers=a, json={"amount": 100}).json()
+    assert (view["leader_id"], view["leader_name"]) == (2, "acheteur")
+
+    clock.advance(timedelta(minutes=29, seconds=59.5))  # arrondi au-dessus : pas 0 avant la fin
+    assert client.get(f"/auctions/{aid}", headers=a).json()["seconds_left"] == 1
+
+    clock.advance(timedelta(seconds=1))
+    done = client.get(f"/auctions/{aid}", headers=a).json()
+    assert (done["status"], done["seconds_left"], done["winner_name"]) == ("sold", 0, "acheteur")
