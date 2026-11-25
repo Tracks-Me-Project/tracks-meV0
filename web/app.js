@@ -20,10 +20,11 @@ async function api(path, options = {}) {
 }
 
 function show(screen) {
-  for (const id of ["login", "home", "boosters", "collection"]) $(id).hidden = id !== screen;
+  for (const id of ["login", "home", "boosters", "collection", "auctions", "auction"]) $(id).hidden = id !== screen;
   $("nav").hidden = screen === "login";
   for (const link of $("nav").children) {
-    link.toggleAttribute("aria-current", link.hash === `#${screen}`);
+    // le détail d'une enchère reste sous l'onglet « Enchères »
+    link.toggleAttribute("aria-current", link.hash === `#${screen === "auction" ? "auctions" : screen}`);
   }
 }
 
@@ -33,6 +34,8 @@ function logout() {
   $("drawn").replaceChildren(); // le tirage et la collection du joueur précédent
   $("cards").replaceChildren();
   $("search").value = "";
+  $("auction-list").replaceChildren();
+  $("auction-detail").replaceChildren();
   show("login");
 }
 
@@ -44,6 +47,8 @@ async function refresh() {
   try {
     if (location.hash === "#boosters") await showBoosters();
     else if (location.hash === "#collection") await showCollection();
+    else if (location.hash === "#auctions") await showAuctions();
+    else if (location.hash.startsWith("#auction/")) await showAuction(location.hash.split("/")[1]);
     else await showHome();
   } catch (err) {
     fail(err);
@@ -52,6 +57,7 @@ async function refresh() {
 
 function fail(err) {
   if (err.status === 401) return logout(); // jeton inconnu (base remise à zéro ?)
+  if (err.message === "AuctionNotFound") return message("Enchère introuvable.");
   message(err.status ? err.message : "Serveur injoignable");
 }
 
@@ -63,26 +69,128 @@ async function showHome() {
   show("home");
 }
 
-let timer; // compte à rebours du prochain booster
+let timer; // le seul décompte actif : celui de l'écran affiché
+
+// Rend une fonction : true si le joueur a changé d'écran ou de compte pendant une requête.
+function watchScreen() {
+  const at = location.hash;
+  const token = sessionStorage.getItem("token");
+  return () => location.hash !== at || sessionStorage.getItem("token") !== token;
+}
+
+function duration(seconds) {
+  const two = (n) => String(n).padStart(2, "0");
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor(seconds / 60) % 60;
+  return h ? `${h}:${two(m)}:${two(seconds % 60)}` : `${m}:${two(seconds % 60)}`;
+}
+
+// Décompte local d'après une échéance (un onglet en veille ne prend pas de retard).
+// Quand l'un d'eux atteint zéro, on redemande au serveur, seul juge.
+function countdown(entries, onZero) {
+  clearTimeout(timer);
+  const now = Date.now();
+  const ends = entries.map((e) => ({ ...e, end: now + e.seconds * 1000 }));
+  const tick = () => {
+    let done = false;
+    for (const { el, label, end } of ends) {
+      const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      el.textContent = `${label} ${duration(left)}`;
+      done ||= left === 0;
+    }
+    if (ends.length) timer = setTimeout(done ? () => onZero().catch(fail) : tick, 1000);
+  };
+  tick();
+}
 
 async function showBoosters() {
+  const stale = watchScreen();
   const { stock, max_stock, seconds_until_next: next } = await api("/boosters");
+  if (stale()) return;
   $("stock").textContent = `${stock} / ${max_stock}`;
   $("open-booster").disabled = stock === 0;
   show("boosters");
-  countdown(next);
+  if (next === null) {
+    clearTimeout(timer);
+    $("next-booster").textContent = "Stock plein";
+  } else {
+    countdown([{ el: $("next-booster"), label: "Prochain booster dans", seconds: next }], showBoosters);
+  }
 }
 
-// Le décompte est local ; à zéro on redemande au serveur, seul juge du stock.
-function countdown(seconds) {
-  clearTimeout(timer);
-  if (seconds === null) return void ($("next-booster").textContent = "Stock plein");
-  const rest = String(seconds % 60).padStart(2, "0");
-  $("next-booster").textContent = `Prochain booster dans ${Math.floor(seconds / 60)}:${rest}`;
-  timer = setTimeout(() => {
-    if (seconds > 0) countdown(seconds - 1);
-    else showBoosters().catch(fail);
-  }, 1000);
+function element(tag, text, className = "") {
+  const el = document.createElement(tag);
+  el.textContent = text; // jamais de HTML
+  el.className = className;
+  return el;
+}
+
+// Ce que cette enchère représente pour le joueur ; vide s'il n'est pas concerné.
+function badge(a, myId) {
+  if (a.status === "sold" && a.winner_id === myId) return "Tu as remporté cette enchère";
+  if (a.seller_id === myId) return "Ton enchère";
+  return a.status === "open" && a.leader_id === myId ? "Tu es en tête" : "";
+}
+
+async function showAuctions() {
+  const stale = watchScreen();
+  const [me, rows] = await Promise.all([api("/me"), api("/auctions")]);
+  if (stale()) return;
+  const entries = [];
+  $("auction-list").replaceChildren(...rows.map((a) => {
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    const left = element("small", "");
+    link.href = `#auction/${a.id}`;
+    link.append(
+      element("span", a.title),
+      element("small", a.artist),
+      element("small", `Prix : ${a.current_price} · ${a.bid_count} mise(s)`),
+      left,
+      element("span", badge(a, me.id), "badge"),
+    );
+    item.append(link);
+    entries.push({ el: left, label: "Fin dans", seconds: a.seconds_left });
+    return item;
+  }));
+  $("no-auction").hidden = rows.length > 0;
+  show("auctions");
+  countdown(entries, showAuctions);
+}
+
+function auctionResult(a) {
+  if (a.status === "sold") return `Vendue à ${a.winner_name} pour ${a.final_price}`;
+  if (a.status === "unsold") return "Terminée sans mise : invendue";
+  return "Annulée par le vendeur";
+}
+
+async function showAuction(id) {
+  const stale = watchScreen();
+  const [me, a] = await Promise.all([api("/me"), api(`/auctions/${encodeURIComponent(id)}`)]);
+  if (stale()) return;
+  const open = a.status === "open";
+  const status = element("p", open ? "" : auctionResult(a));
+  const list = document.createElement("dl");
+  const rows = [
+    ["Vendeur", a.seller_name],
+    ["Prix de départ", a.start_price],
+    ["Mises", a.bid_count],
+    ...(open ? [
+      ["Prix courant", a.current_price],
+      ["Mise minimale", a.min_next_bid],
+      ["Meneur", a.leader_name ?? "personne"],
+    ] : []),
+  ];
+  for (const [label, value] of rows) list.append(element("dt", label), element("dd", value));
+  $("auction-detail").replaceChildren(
+    element("h2", a.title),
+    element("p", [a.artist, a.album].filter(Boolean).join(" · ")),
+    element("p", badge(a, me.id), "badge"),
+    status,
+    list,
+  );
+  show("auction");
+  countdown(open ? [{ el: status, label: "Fin dans", seconds: a.seconds_left }] : [], () => showAuction(id));
 }
 
 // Titre (« ×2 » si plusieurs) puis artiste · album · année. textContent : jamais de HTML.
@@ -184,7 +292,10 @@ $("open-booster").addEventListener("click", async () => {
   }
 });
 
-window.addEventListener("hashchange", refresh);
+window.addEventListener("hashchange", () => {
+  $("auction-detail").replaceChildren();
+  refresh();
+});
 
 $("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();

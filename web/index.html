@@ -38,6 +38,18 @@
       <button id="more" type="button" class="secondary" hidden>Afficher plus</button>
     </section>
 
+    <!-- Écrans Enchères : liste (#auctions) puis détail (#auction/12) -->
+    <section id="auctions" hidden>
+      <h2>Enchères</h2>
+      <p id="no-auction" hidden>Aucune enchère ouverte.</p>
+      <ul id="auction-list"></ul>
+    </section>
+
+    <section id="auction" hidden>
+      <a href="#auctions">← Enchères</a>
+      <div id="auction-detail"></div>
+    </section>
+
     <!-- Écran 2 : joueur connecté -->
     <section id="home" hidden>
       <h2 id="player-name"></h2>
@@ -55,6 +67,7 @@
     <a href="#home">Accueil</a>
     <a href="#boosters">Boosters</a>
     <a href="#collection">Collection</a>
+    <a href="#auctions">Enchères</a>
   </nav>
   <script src="app.js"></script>
 </body>
