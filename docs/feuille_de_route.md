@@ -18,7 +18,7 @@ Terminé et fusionné (PR #1 à #7) : squelette, comptes et journal de monnaie, 
 | A02 | Socle front | Page mobile, créer un joueur, voir son solde | ✅ | [A02](etapes/A02_socle_front.md) | #11, correctif #12 |
 | A03 | Boosters | Voir son stock, ouvrir un booster | ✅ | [A03](etapes/A03_boosters.md) | #13 |
 | A04 | Collection et recyclage | Liste des titres, recherche, recycler un doublon | ✅ | [A04](etapes/A04_collection.md) | #14 |
-| A05 | Enchères en lecture | Liste, détail, compte à rebours | ✅ | [A05](etapes/A05_encheres_lecture.md) | PRNUM |
+| A05 | Enchères en lecture | Liste, détail, compte à rebours | ✅ | [A05](etapes/A05_encheres_lecture.md) | #15 |
 | A06 | Enchères : créer et annuler | Mettre un titre aux enchères | ⬜ | | |
 | A07 | Enchères : miser | Surenchérir, mise bloquée puis rendue | ⬜ | | |
 | A08 | Paris | Parier, voir ses paris, interdits expliqués | ⬜ | | |

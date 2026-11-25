@@ -1,7 +1,7 @@
 # Étape A05 : enchères en lecture
 
 - **Statut** : ✅ terminé le 2026-11-25
-- **Branche** : `a05-encheres-lecture` · **PR** : PRNUM
+- **Branche** : `a05-encheres-lecture` · **PR** : #15
 
 ## 1. Résumé fonctionnel
 Un onglet « Enchères » liste les enchères ouvertes (la plus proche de sa fin en premier) avec prix, nombre de mises et temps restant. Un toucher ouvre le détail : vendeur, prix, mise minimale suivante, meneur, et « Ton enchère » ou « Tu es en tête ». À la fin du décompte, le résultat s'affiche (vendue à qui et combien, invendue ou annulée). On ne peut pas encore créer ni miser depuis la page (A06, A07).
