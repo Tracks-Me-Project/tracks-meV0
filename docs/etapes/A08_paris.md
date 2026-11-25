@@ -1,7 +1,7 @@
 # Étape A08 : paris
 
 - **Statut** : ✅ terminé le 2026-11-25
-- **Branche** : `a08-paris` · **PR** : PRNUM
+- **Branche** : `a08-paris` · **PR** : #18
 
 ## 1. Résumé fonctionnel
 Sur le détail d'une enchère, on peut parier sur son prix final : mise fixe affichée, temps restant pour parier, confirmation. Quand on ne peut pas parier (sa propre vente, déjà enchéri, déjà parié, paris fermés), la raison est écrite à la place du formulaire. Après un pari, on ne peut plus enchérir sur cette vente, et c'est dit avant de confirmer. L'onglet « Paris » montre ses paris en cours et terminés (prix final, gain, résultat net) et explique le partage de la cagnotte. Ni le nombre de parieurs ni la cagnotte ne sont affichés avant la fin.
