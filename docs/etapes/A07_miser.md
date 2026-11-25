@@ -1,7 +1,7 @@
 # Étape A07 : miser
 
 - **Statut** : ✅ terminé le 2026-11-25
-- **Branche** : `a07-miser` · **PR** : PRNUM
+- **Branche** : `a07-miser` · **PR** : #17
 
 ## 1. Résumé fonctionnel
 Sur le détail d'une enchère ouverte, on voit son solde disponible, on saisit une mise (préremplie au minimum), on confirme. La somme est bloquée tant qu'on mène, rendue si quelqu'un surenchérit, retirée si on gagne. Le vendeur et le meneur ne voient pas le formulaire. Les refus sont expliqués en clair.
