@@ -1,7 +1,7 @@
 # Étape A02 : socle front
 
 - **Statut** : ✅ terminé le 2026-11-24
-- **Branche** : `a02-socle-front` · **PR** : à renseigner
+- **Branche** : `a02-socle-front` · **PR** : #11 (correctif : #12)
 
 ## 1. Résumé fonctionnel
 Le jeu a une première page, pensée pour le téléphone. On saisit un pseudo, on clique « Jouer », et on voit son solde (disponible et bloqué). « Changer de joueur » permet d'en créer un autre. Le pied de page indique quelles règles sont actives (normales ou essai). Chaque onglet du navigateur est un joueur distinct, ce qui permet de tester à plusieurs sur un seul ordinateur.
