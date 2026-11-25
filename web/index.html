@@ -19,6 +19,15 @@
       </form>
     </section>
 
+    <!-- Écran Boosters -->
+    <section id="boosters" hidden>
+      <h2>Boosters</h2>
+      <p>Stock : <strong id="stock">…</strong></p>
+      <p id="next-booster"></p>
+      <button id="open-booster" type="button" disabled>Ouvrir un booster</button>
+      <ul id="drawn"></ul>
+    </section>
+
     <!-- Écran 2 : joueur connecté -->
     <section id="home" hidden>
       <h2 id="player-name"></h2>
@@ -32,6 +41,10 @@
     <p id="message" role="alert"></p>
     <footer>Règles : <span id="rules-file">…</span></footer>
   </main>
+  <nav id="nav" hidden>
+    <a href="#home">Accueil</a>
+    <a href="#boosters">Boosters</a>
+  </nav>
   <script src="app.js"></script>
 </body>
 </html>

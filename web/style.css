@@ -1,6 +1,6 @@
 /* Pensé mobile : une colonne, gros boutons, texte 16 px (sinon iPhone zoome sur les champs). */
 body { margin: 0; font: 16px/1.4 system-ui, sans-serif; background: #f4f4f6; color: #1b1b1f; }
-main { max-width: 480px; margin: 0 auto; padding: 16px; }
+main { max-width: 480px; margin: 0 auto; padding: 16px 16px 72px; }  /* place pour la barre */
 h1 { font-size: 1.4rem; margin: 0 0 16px; }
 input, button { font: inherit; width: 100%; min-height: 44px; box-sizing: border-box; margin-top: 8px; }
 input { padding: 0 12px; border: 1px solid #999; border-radius: 8px; }
@@ -11,3 +11,11 @@ dt, dd { margin: 0; }
 dd { font-weight: 600; }
 #message { color: #c92a2a; min-height: 1.4em; }
 footer { margin-top: 24px; font-size: 0.85rem; color: #666; }
+button:disabled { opacity: 0.5; }
+ul { list-style: none; padding: 0; }
+li { background: #fff; border-radius: 8px; padding: 8px 12px; margin-top: 8px; }
+li small { display: block; color: #666; }
+nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #ddd; }
+nav[hidden] { display: none; }
+nav a { flex: 1; text-align: center; line-height: 56px; color: #666; text-decoration: none; }
+nav a[aria-current] { color: #3b5bdb; font-weight: 600; }

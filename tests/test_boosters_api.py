@@ -33,7 +33,7 @@ def test_stock_open_collection(client, auth):
     assert client.get("/boosters", headers=auth).json() == {
         "stock": 10, "max_stock": 10, "seconds_until_next": None}
     opened = client.post("/boosters/open", headers=auth).json()["tracks"]
-    assert 1 <= len(opened) <= 5
+    assert len(opened) == 5
     assert client.get("/boosters", headers=auth).json()["stock"] == 9
     coll = client.get("/collection", headers=auth).json()
     assert sum(c["quantity"] for c in coll) == 5

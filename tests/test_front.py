@@ -13,6 +13,7 @@ def test_root_redirects_to_app():
 def test_page_served():
     r = client.get("/app/")
     assert r.status_code == 200 and 'id="login-form"' in r.text
+    assert 'id="open-booster"' in r.text
     assert client.get("/app/app.js").status_code == 200
 
 

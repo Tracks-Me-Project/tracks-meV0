@@ -71,4 +71,4 @@ def open_booster(
         collection.add_copies(session, account_id, mbid, n)
     found = session.scalars(select(Track).where(Track.recording_mbid.in_(drawn)))
     by_id = {t.recording_mbid: t for t in found}
-    return [by_id[m] for m in drawn]
+    return [by_id[m] for m in drawn.elements()]  # doublons répétés

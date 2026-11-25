@@ -47,7 +47,7 @@ def test_new_account_has_full_stock(session, acc, clock):
 
 def test_open_removes_one_and_adds_five_cards(session, acc, clock):
     drawn = boosters.open_booster(session, acc.id, clock, random.Random(1))
-    assert len(drawn) <= 5  # moins de 5 objets si un titre sort deux fois
+    assert len(drawn) == 5  # doublons compris
     assert _stock(session, acc, clock) == 9
     assert _total_cards(session, acc) == 5
 

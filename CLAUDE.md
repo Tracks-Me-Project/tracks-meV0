@@ -19,7 +19,8 @@ Serveur de jeu (proof of concept) : collection de tracks musicales, dont le cœu
 
 ## Décisions techniques
 
-- API seule, testée par scripts (pas d'interface pour l'instant).
+- API testée par scripts ; interface rudimentaire pensée mobile dans `web/` (HTML + JS, sans compilation), voir `docs/feuille_de_route.md`.
+- Toute route qui lit ou écrit en base utilise `DbSession` (`api/deps.py`), jamais `Depends(get_session)`.
 - Python 3.12+, FastAPI, Postgres 16 (Docker), code typé.
 - Comptes et monnaie minimaux : un jeton par joueur, pas de vraie authentification.
 - Monnaie en entiers ; journal des opérations en ajout seul, le solde se déduit du journal.
