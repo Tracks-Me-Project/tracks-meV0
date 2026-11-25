@@ -1,7 +1,7 @@
 # Étape A09 : rafraîchissement automatique
 
 - **Statut** : ✅ terminé le 2026-11-25
-- **Branche** : `a09-rafraichissement` · **PR** : PRNUM
+- **Branche** : `a09-rafraichissement` · **PR** : #19
 
 ## 1. Résumé fonctionnel
 L'accueil, la liste et le détail des enchères et les paris se mettent à jour seuls, toutes les 3 secondes : on voit les surenchères, les nouvelles ventes et les résultats sans recharger. Une saisie en cours n'est pas effacée. Si on perd la tête d'une enchère dont le détail est ouvert, on est prévenu : « Tu as été dépassé ».
