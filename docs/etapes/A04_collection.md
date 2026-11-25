@@ -1,7 +1,7 @@
 # Étape A04 : collection et recyclage
 
 - **Statut** : ✅ terminé le 2026-11-25
-- **Branche** : `a04-collection` · **PR** : PRNUM
+- **Branche** : `a04-collection` · **PR** : #14
 
 ## 1. Résumé fonctionnel
 Un onglet « Collection » liste les titres du joueur (avec « ×N » pour les doublons), 50 à la fois. Un champ cherche par titre, artiste ou album. Chaque doublon peut être recyclé en monnaie (un seul ou tous), après confirmation ; le dernier exemplaire est protégé. Le jeu indique la monnaie gagnée et ce qui reste du plafond du jour.
