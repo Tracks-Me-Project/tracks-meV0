@@ -22,3 +22,4 @@ def test_rules_endpoint():
     body = client.get("/rules").json()
     assert body["file"] == "rules.toml"
     assert body["rules"]["booster"]["max_stock"] == 10
+    assert body["rules"]["interface"]["refresh_seconds"] == 3

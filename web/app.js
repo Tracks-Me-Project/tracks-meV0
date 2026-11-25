@@ -42,27 +42,70 @@ function logout() {
 }
 
 // L'écran courant est dans l'adresse (#boosters) : retour du téléphone et F5 fonctionnent.
+function currentScreen(quiet) {
+  if (location.hash === "#boosters") return showBoosters();
+  if (location.hash === "#collection") return showCollection();
+  if (location.hash === "#auctions") return showAuctions(quiet);
+  if (location.hash === "#bets") return showBets(quiet);
+  if (location.hash.startsWith("#auction/")) return showAuction(location.hash.split("/")[1], quiet);
+  return showHome(quiet);
+}
+
 async function refresh() {
   clearTimeout(timer);
   message();
+  ledAuction = null; // l'alerte « dépassé » ne vaut que pour un détail resté ouvert
   if (!sessionStorage.getItem("token")) return show("login");
   try {
-    if (location.hash === "#boosters") await showBoosters();
-    else if (location.hash === "#collection") await showCollection();
-    else if (location.hash === "#auctions") await showAuctions();
-    else if (location.hash === "#bets") await showBets();
-    else if (location.hash.startsWith("#auction/")) await showAuction(location.hash.split("/")[1]);
-    else await showHome();
+    await currentScreen(false);
   } catch (err) {
     fail(err);
   }
 }
 
+// Rafraîchissement automatique. « quiet » : demandé par la page, et non par le joueur : on ne
+// redessine que si les données ont changé, et jamais pendant l'envoi d'une action.
+const UNREACHABLE = "Serveur injoignable";
+let pollTimer;
+let pollMs;
+let drawnData; // données de l'écran affiché, sans le détail des secondes
+let renderId = 0; // une réponse silencieuse dépassée par une demande plus récente est ignorée
+let ledAuction = null; // enchère affichée dont le joueur était en tête
+
+const busy = () => document.querySelector("#auction-detail button:disabled") !== null;
+
+// À appeler après la réponse du serveur : true s'il ne faut pas redessiner.
+function skipDraw(quiet, id, data) {
+  const next = JSON.stringify(data, (key, v) => (key.endsWith("seconds_left") ? v > 0 : v));
+  if (quiet && (id !== renderId || busy() || next === drawnData)) return true;
+  drawnData = next;
+  return false;
+}
+
+async function poll() {
+  clearTimeout(pollTimer);
+  const idle = ["#boosters", "#collection"].includes(location.hash); // formulaires et décompte
+  if (!idle && !document.hidden && sessionStorage.getItem("token") && !busy()) {
+    try {
+      await currentScreen(true);
+      if ($("message").textContent === UNREACHABLE) message();
+    } catch (err) {
+      fail(err);
+    }
+  }
+  clearTimeout(pollTimer); // une seule boucle, même si poll() a été relancé entre-temps
+  pollTimer = setTimeout(poll, pollMs); // après la réponse : jamais deux requêtes empilées
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && pollMs) poll(); // retour sur l'onglet : mise à jour immédiate
+});
+
 function fail(err) {
   if (err.status === 401) return logout(); // jeton inconnu (base remise à zéro ?)
   const refusal = REFUSALS[err.message];
   if (refusal) return message(refusal(err.detail));
-  message(err.status ? err.message : "Serveur injoignable");
+  message(err.status ? err.message : UNREACHABLE);
 }
 
 // Refus du jeu (nom envoyé par le serveur) en clair.
@@ -89,8 +132,11 @@ const REFUSALS = {
   TooManyOpenBets: () => "Tu as déjà le maximum de paris en cours.",
 };
 
-async function showHome() {
+async function showHome(quiet) {
+  const stale = watchScreen();
+  const id = ++renderId;
   const me = await api("/me");
+  if (stale() || skipDraw(quiet, id, me)) return;
   $("player-name").textContent = me.name;
   $("available").textContent = me.available;
   $("locked").textContent = me.locked;
@@ -160,10 +206,11 @@ function badge(a, myId) {
   return a.status === "open" && a.leader_id === myId ? "Tu es en tête" : "";
 }
 
-async function showAuctions() {
+async function showAuctions(quiet) {
   const stale = watchScreen();
+  const id = ++renderId;
   const [me, rows] = await Promise.all([api("/me"), api("/auctions")]);
-  if (stale()) return;
+  if (stale() || skipDraw(quiet, id, [me, rows])) return;
   const entries = [];
   $("auction-list").replaceChildren(...rows.map((a) => {
     const item = document.createElement("li");
@@ -192,10 +239,39 @@ function auctionResult(a) {
   return "Annulée par le vendeur";
 }
 
-async function showAuction(id) {
+// Le redessin ne doit pas effacer ce que le joueur saisit.
+function typedInputs() {
+  return [...document.querySelectorAll("#auction-detail input")]
+    .filter((input) => input.value !== input.defaultValue || input === document.activeElement)
+    .map((input) => ({
+      name: input.name,
+      value: input.value,
+      min: Number(input.min),
+      focused: input === document.activeElement,
+    }));
+}
+
+function restoreInputs(typed) {
+  for (const { name, value, min, focused } of typed) {
+    const input = document.querySelector(`#auction-detail input[name="${name}"]`);
+    if (!input) continue;
+    // Un montant qui était valable et ne l'est plus laisse la place au nouveau minimum.
+    const outdated = Number(value) >= min && Number(value) < Number(input.min);
+    if (!outdated) input.value = value;
+    if (focused) input.focus();
+  }
+}
+
+async function showAuction(id, quiet) {
   const stale = watchScreen();
+  const request = ++renderId;
   const [me, a] = await Promise.all([api("/me"), api(`/auctions/${encodeURIComponent(id)}`)]);
-  if (stale()) return;
+  if (stale() || skipDraw(quiet, request, [me, a])) return;
+  if (ledAuction === a.id && a.leader_id !== me.id) {
+    message("Tu as été dépassé : ta mise t'est rendue.");
+  }
+  ledAuction = a.leader_id === me.id ? a.id : null;
+  const typed = typedInputs();
   const open = a.status === "open";
   const status = element("p", open ? "" : auctionResult(a));
   const list = document.createElement("dl");
@@ -236,6 +312,7 @@ async function showAuction(id) {
   }
   if (open) $("auction-detail").append(...betSection(a, me, entries));
   show("auction");
+  restoreInputs(typed);
   countdown(entries, () => showAuction(id));
 }
 
@@ -259,6 +336,10 @@ function showDrawn(tracks) {
 
 const PAGE = 50;
 const rules = api("/rules").then((r) => { $("rules-file").textContent = r.file; return r.rules; });
+rules.then((r) => {
+  pollMs = r.interface.refresh_seconds * 1000;
+  pollTimer = setTimeout(poll, pollMs);
+});
 rules.catch(() => {});
 let loadId = 0; // une réponse en retard (frappe suivante) est ignorée
 
@@ -323,6 +404,7 @@ function sellForm(track, { min_start_price: min, durations_minutes: durations })
     const when = duration.selectedOptions[0].text;
     if (!confirm(`Vendre « ${track.title} » à partir de ${price.value}, pendant ${when} ?${last}`)) return;
     submit.disabled = true; // pas de double appui
+    renderId++;
     message();
     try {
       const body = JSON.stringify({
@@ -385,7 +467,7 @@ function bidForm(a, available) {
   const form = document.createElement("form");
   const amount = document.createElement("input");
   const min = a.min_next_bid;
-  Object.assign(amount, { type: "number", inputMode: "numeric", min, step: 1, value: min, required: true });
+  Object.assign(amount, { type: "number", inputMode: "numeric", name: "amount", min, step: 1, defaultValue: min, required: true });
   const label = element("label", `Ta mise (minimum ${min}, disponible ${available})`);
   label.append(amount);
   const submit = element("button", "Miser");
@@ -397,6 +479,7 @@ function bidForm(a, available) {
     const noBet = a.bets_seconds_left > 0 ? "\nTu ne pourras plus parier sur cette enchère." : "";
     if (!confirm(`${question}\nLa somme est bloquée tant que tu mènes.${noBet}`)) return;
     submit.disabled = true; // pas de double appui
+    renderId++;
     message();
     try {
       const body = JSON.stringify({ amount: Number(amount.value) });
@@ -427,7 +510,7 @@ function betSection(a, me, entries) {
   const form = document.createElement("form");
   const prediction = document.createElement("input");
   const min = a.current_price;
-  Object.assign(prediction, { type: "number", inputMode: "numeric", min, step: 1, value: min, required: true });
+  Object.assign(prediction, { type: "number", inputMode: "numeric", name: "prediction", min, step: 1, defaultValue: min, required: true });
   const label = element("label", `Prix final prévu (mise ${a.bet_stake}, disponible ${me.available})`);
   label.append(prediction);
   const submit = element("button", "Parier");
@@ -439,6 +522,7 @@ function betSection(a, me, entries) {
     const warning = `Mise ${a.bet_stake}, bloquée jusqu'à la fin. Tu ne pourras plus enchérir ici.`;
     if (!confirm(`${question}\n${warning}`)) return;
     submit.disabled = true; // pas de double appui
+    renderId++;
     message();
     try {
       const body = JSON.stringify({ prediction: Number(prediction.value) });
@@ -472,10 +556,11 @@ function betResult(b) {
   return `Prix final ${b.final_price} · gain ${b.payout} (net ${net > 0 ? "+" : ""}${net})`;
 }
 
-async function showBets() {
+async function showBets(quiet) {
   const stale = watchScreen();
+  const id = ++renderId;
   const [game, rows] = await Promise.all([rules, api("/bets")]);
-  if (stale()) return;
+  if (stale() || skipDraw(quiet, id, rows)) return;
   const entries = [];
   const lists = { open: [], done: [] };
   for (const b of rows) {
@@ -507,6 +592,7 @@ async function showBets() {
 async function cancelAuction(button, a) {
   if (!confirm(`Annuler la vente de « ${a.title} » ? Le titre revient dans ta collection.`)) return;
   button.disabled = true;
+  renderId++;
   message();
   try {
     await api(`/auctions/${a.id}/cancel`, { method: "POST" });

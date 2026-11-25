@@ -31,3 +31,6 @@ max_stock = 10
 [recycling]
 coins_per_track = 1
 daily_cap = 50                  # non décidé : valeur par défaut
+
+[interface]
+refresh_seconds = 3             # la page interroge le serveur à cet intervalle

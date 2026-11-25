@@ -57,3 +57,12 @@ def test_rules_path_env_var(monkeypatch: pytest.MonkeyPatch):
         get_settings.cache_clear()
         get_rules.cache_clear()
     assert get_rules().booster.minutes_per_booster == 60
+
+
+def test_refresh_interval_must_be_positive(tmp_path: Path):
+    text = Path("config/rules.toml").read_text()
+    bad = text.replace("refresh_seconds = 3", "refresh_seconds = 0")
+    p = tmp_path / "rules.toml"
+    p.write_text(bad)
+    with pytest.raises(ValidationError):
+        load_rules(p)

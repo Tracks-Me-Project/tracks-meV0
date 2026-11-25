@@ -4,7 +4,7 @@ import tomllib
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 RULES_PATH = Path(__file__).resolve().parents[2] / "config" / "rules.toml"
@@ -56,12 +56,17 @@ class RecyclingRules(_Frozen):
     daily_cap: int
 
 
+class InterfaceRules(_Frozen):
+    refresh_seconds: int = Field(gt=0)  # 0 ferait interroger le serveur en boucle
+
+
 class GameRules(_Frozen):
     account: AccountRules
     auction: AuctionRules
     bet: BetRules
     booster: BoosterRules
     recycling: RecyclingRules
+    interface: InterfaceRules
 
 
 class Settings(BaseSettings):
