@@ -123,3 +123,17 @@ def test_view_names_and_time_left(client, session, clock):
     clock.advance(timedelta(seconds=1))
     done = client.get(f"/auctions/{aid}", headers=a).json()
     assert (done["status"], done["seconds_left"], done["winner_name"]) == ("sold", 0, "acheteur")
+
+
+def test_view_cancel_seconds_left(client, session, clock):
+    seller, a = _player(client, session, "s", 2), _player(client, session, "a")
+    body = {"recording_mbid": "r1", "start_price": 100, "duration_minutes": 30}
+    first, second = (client.post("/auctions", headers=seller, json=body).json() for _ in range(2))
+    assert first["cancel_seconds_left"] == 900
+
+    bid = client.post(f"/auctions/{first['id']}/bids", headers=a, json={"amount": 100}).json()
+    assert bid["cancel_seconds_left"] == 0  # une mise : plus d'annulation
+
+    url = f"/auctions/{second['id']}"
+    clock.advance(timedelta(minutes=15))
+    assert client.get(url, headers=a).json()["cancel_seconds_left"] == 0  # délai passé

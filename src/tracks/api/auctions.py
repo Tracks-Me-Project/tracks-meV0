@@ -54,7 +54,11 @@ def _view(session: Session, a: Auction, clock: Clock) -> dict:
     track = session.get(Track, a.recording_mbid)
     count = session.scalar(select(func.count()).select_from(Bid).where(Bid.auction_id == a.id))
     leader_id = top.bidder_id if top else None
-    left = (a.ends_at - clock.now()).total_seconds() if a.status == "open" else 0
+    now = clock.now()
+    left = (a.ends_at - now).total_seconds() if a.status == "open" else 0
+    # 0 dès qu'une mise existe : l'annulation n'est plus possible.
+    cancellable = a.status == "open" and not top
+    cancel_left = (auctions.cancel_deadline(a) - now).total_seconds() if cancellable else 0
     return {
         "id": a.id,
         "seller_id": a.seller_id,
@@ -72,6 +76,7 @@ def _view(session: Session, a: Auction, clock: Clock) -> dict:
         "ends_at": a.ends_at,
         # calculé par le serveur : l'horloge du téléphone n'intervient pas. Arrondi au-dessus.
         "seconds_left": max(0, math.ceil(left)),
+        "cancel_seconds_left": max(0, math.ceil(cancel_left)),
         "bet_stake": bets.stake_for(a.start_price),
         "bets_close_at": a.starts_at
         + (a.ends_at - a.starts_at) * get_rules().bet.close_at_percent_of_duration // 100,

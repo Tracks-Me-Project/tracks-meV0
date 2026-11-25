@@ -39,7 +39,7 @@ Hors : quêtes, haut-faits, souhaits, jauge chaud/froid, tirage orienté (le tir
 
 Références : `docs/reference/regles_de_base.md`, `bilan_paris.md`, `resume_regles_de_base_associe.md`. En cas d'écart, ce qui suit (périmètre du PoC) prévaut sur ces documents.
 
-- **Enchères** : durées 30 min, 1 h, 3 h, 6 h, 12 h. Chaque mise dépasse la précédente d'au moins 5 %. 5 enchères ouvertes au plus par compte. Aucun frais, aucune commission. Mise bloquée, rendue si on perd, retirée si on gagne. Le vendeur peut annuler pendant la première moitié de la durée.
+- **Enchères** : durées 30 min, 1 h, 3 h, 6 h, 12 h. Chaque mise dépasse la précédente d'au moins 5 %. 5 enchères ouvertes au plus par compte. Aucun frais, aucune commission. Mise bloquée, rendue si on perd, retirée si on gagne. Le vendeur peut annuler pendant la première moitié de la durée, tant que personne n'a enchéri.
 - **Paris** : pronostic libre du prix final. Mise fixe = 10 % du prix de départ. 3 paris ouverts au plus. Fermés à 50 % de la durée. Pari ≥ prix courant. Podium : les 3 plus proches se partagent 80 % de la cagnotte (50/30/20), les autres parieurs le reste ; à 2 parieurs 70/30 ; parieur seul remboursé ; gain plafonné à 4× la mise ; arrondis détruits. Interdit : parier sur sa propre enchère, enchérir ET parier sur la même enchère.
 - **Boosters** : 5 titres, 1 par heure, stock max 10, tirage uniforme dans le catalogue. Pas d'achat de boosters avec la monnaie.
 - **Recyclage** : 1 titre doublon recyclé = 1 de monnaie, plafond quotidien en configuration (défaut 50, non décidé).

@@ -1,6 +1,6 @@
 """Enchères. Aucune fonction ne commit (sauf settle_due, qui règle une enchère par transaction)."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -187,6 +187,12 @@ def place_bid(
     return bid
 
 
+def cancel_deadline(auction: Auction) -> datetime:
+    """Instant à partir duquel le vendeur ne peut plus annuler."""
+    window = (auction.ends_at - auction.starts_at) * get_rules().auction.cancel_window_percent
+    return auction.starts_at + window // 100
+
+
 def cancel(session: Session, auction_id: int, seller_id: int, clock: Clock) -> None:
     """Le vendeur annule pendant la première moitié de la durée, tant qu'il n'y a pas de mise.
     Les mises des paris sont rendues."""
@@ -195,8 +201,7 @@ def cancel(session: Session, auction_id: int, seller_id: int, clock: Clock) -> N
         raise NotSeller
     if auction.status != "open":
         raise AuctionClosed
-    window = (auction.ends_at - auction.starts_at) * get_rules().auction.cancel_window_percent
-    if clock.now() >= auction.starts_at + window // 100:
+    if clock.now() >= cancel_deadline(auction):
         raise CancelWindowPassed
     if top_bid(session, auction_id):
         raise HasBids
