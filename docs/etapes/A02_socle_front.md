@@ -37,3 +37,6 @@ Préparation : `docker compose up -d`, `alembic upgrade head`, puis `TRACKS_RULE
 - Couverts : redirection, page et script servis, `/rules`. Vérification de bout en bout du serveur réel en mode essai (curl) et de la syntaxe JS (`node --check`).
 - Non couvert : le comportement dans un vrai navigateur (recette manuelle ci-dessus).
 - `ruff check .` : ✅ · `pytest` : ✅ (114 tests)
+
+## Correctif ultérieur (2026-11-25, branche `correctif-commit-avant-reponse`)
+Dans un vrai navigateur, « Jouer » restait sur l'écran du pseudo : le serveur validait la transaction **après** avoir répondu, et `GET /me` arrivait avant (401). Le même défaut pouvait annoncer « succès » pour une mise jamais enregistrée (défaut présent depuis le PoC). Corrigé par `DbSession` (`src/tracks/api/deps.py`), couvert par `tests/test_commit.py`. Toute nouvelle route doit utiliser `DbSession`, jamais `Depends(get_session)` directement.

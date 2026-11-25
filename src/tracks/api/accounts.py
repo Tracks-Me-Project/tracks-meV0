@@ -3,12 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
 from tracks import accounts
-from tracks.api.deps import get_clock
+from tracks.api.deps import DbSession, get_clock
 from tracks.clock import Clock
-from tracks.db import get_session
 from tracks.models import Account
 
 router = APIRouter()
@@ -21,7 +19,7 @@ class NewAccount(BaseModel):
 
 def current_account(
     creds: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
 ) -> Account:
     account = accounts.find_by_token(session, creds.credentials) if creds else None
     if account is None:
@@ -32,7 +30,7 @@ def current_account(
 @router.post("/accounts", status_code=201)
 def create(
     body: NewAccount,
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> dict:
     try:

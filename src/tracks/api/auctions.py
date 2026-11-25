@@ -7,10 +7,9 @@ from sqlalchemy.orm import Session
 
 from tracks import auctions, bets, ledger
 from tracks.api.accounts import current_account
-from tracks.api.deps import MAX_INT, Amount, AuctionId, Mbid, Offset, get_clock
+from tracks.api.deps import MAX_INT, Amount, AuctionId, DbSession, Mbid, Offset, get_clock
 from tracks.clock import Clock
 from tracks.config import get_rules
-from tracks.db import get_session
 from tracks.models import Account, Auction, Bet, Bid, Track
 
 router = APIRouter()
@@ -73,7 +72,7 @@ def _view(session: Session, a: Auction) -> dict:
 def create(
     body: NewAuction,
     account: Annotated[Account, Depends(current_account)],
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> dict:
     try:
@@ -88,7 +87,7 @@ def create(
 @router.get("/auctions")
 def list_open(
     _: Annotated[Account, Depends(current_account)],
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Offset = 0,
@@ -107,7 +106,7 @@ def list_open(
 def get_one(
     auction_id: AuctionId,
     _: Annotated[Account, Depends(current_account)],
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> dict:
     try:
@@ -122,7 +121,7 @@ def bid(
     auction_id: AuctionId,
     body: NewBid,
     account: Annotated[Account, Depends(current_account)],
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> dict:
     try:
@@ -136,7 +135,7 @@ def bid(
 def cancel(
     auction_id: AuctionId,
     account: Annotated[Account, Depends(current_account)],
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> dict:
     try:
@@ -151,7 +150,7 @@ def place_bet(
     auction_id: AuctionId,
     body: NewBet,
     account: Annotated[Account, Depends(current_account)],
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> dict:
     try:
@@ -164,7 +163,7 @@ def place_bet(
 @router.get("/bets")
 def my_bets(
     account: Annotated[Account, Depends(current_account)],
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Offset = 0,
 ) -> list[dict]:

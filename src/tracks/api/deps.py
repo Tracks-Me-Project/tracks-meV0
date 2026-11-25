@@ -1,9 +1,16 @@
 from typing import Annotated
 
-from fastapi import Path, Query
+from fastapi import Depends, Path, Query
 from pydantic import Field
+from sqlalchemy.orm import Session
 
 from tracks.clock import Clock, SystemClock
+from tracks.db import get_session
+
+# scope="function" : le commit a lieu AVANT l'envoi de la réponse. Par défaut FastAPI le fait après,
+# et le client recevrait « succès » pour une écriture pas encore (ou jamais) enregistrée.
+# Toutes les routes passent par DbSession pour partager la même session dans une requête.
+DbSession = Annotated[Session, Depends(get_session, scope="function")]
 
 
 def get_clock() -> Clock:
