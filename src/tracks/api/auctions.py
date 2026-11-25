@@ -10,7 +10,6 @@ from tracks import auctions, bets, ledger
 from tracks.api.accounts import current_account
 from tracks.api.deps import MAX_INT, Amount, AuctionId, DbSession, Mbid, Offset, get_clock
 from tracks.clock import Clock
-from tracks.config import get_rules
 from tracks.models import Account, Auction, Bet, Bid, Track
 
 router = APIRouter()
@@ -48,8 +47,8 @@ def _name(session: Session, account_id: int | None) -> str | None:
     return None if account_id is None else session.get(Account, account_id).name
 
 
-def _view(session: Session, a: Auction, clock: Clock) -> dict:
-    # shortcut: jusqu'à 6 requêtes par enchère (100 au plus), à regrouper si la liste est lente.
+def _view(session: Session, a: Auction, clock: Clock, viewer_id: int) -> dict:
+    # shortcut: jusqu'à 8 requêtes par enchère (100 au plus), à regrouper si la liste est lente.
     top = auctions.top_bid(session, a.id)
     track = session.get(Track, a.recording_mbid)
     count = session.scalar(select(func.count()).select_from(Bid).where(Bid.auction_id == a.id))
@@ -59,6 +58,13 @@ def _view(session: Session, a: Auction, clock: Clock) -> dict:
     # 0 dès qu'une mise existe : l'annulation n'est plus possible.
     cancellable = a.status == "open" and not top
     cancel_left = (auctions.cancel_deadline(a) - now).total_seconds() if cancellable else 0
+    closes_at = auctions.bets_close_at(a)
+    bets_left = (closes_at - now).total_seconds() if a.status == "open" else 0
+    # Propres à celui qui regarde : le pronostic d'un autre ne sort jamais.
+    mine = session.get(Bet, (a.id, viewer_id))
+    i_have_bid = session.scalar(
+        select(Bid.id).where(Bid.auction_id == a.id, Bid.bidder_id == viewer_id).limit(1)
+    )
     return {
         "id": a.id,
         "seller_id": a.seller_id,
@@ -78,8 +84,10 @@ def _view(session: Session, a: Auction, clock: Clock) -> dict:
         "seconds_left": max(0, math.ceil(left)),
         "cancel_seconds_left": max(0, math.ceil(cancel_left)),
         "bet_stake": bets.stake_for(a.start_price),
-        "bets_close_at": a.starts_at
-        + (a.ends_at - a.starts_at) * get_rules().bet.close_at_percent_of_duration // 100,
+        "bets_close_at": closes_at,
+        "bets_seconds_left": max(0, math.ceil(bets_left)),
+        "my_prediction": mine.prediction if mine else None,
+        "i_have_bid": i_have_bid is not None,
         "status": a.status,
         "winner_id": a.winner_id,
         "winner_name": _name(session, a.winner_id),
@@ -100,12 +108,12 @@ def create(
         )
     except auctions.AuctionError as exc:
         raise _error(exc) from None
-    return _view(session, a, clock)
+    return _view(session, a, clock, account.id)
 
 
 @router.get("/auctions")
 def list_open(
-    _: Annotated[Account, Depends(current_account)],
+    account: Annotated[Account, Depends(current_account)],
     session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -118,13 +126,13 @@ def list_open(
         .limit(limit)
         .offset(offset)
     )
-    return [_view(session, a, clock) for a in rows]
+    return [_view(session, a, clock, account.id) for a in rows]
 
 
 @router.get("/auctions/{auction_id}")
 def get_one(
     auction_id: AuctionId,
-    _: Annotated[Account, Depends(current_account)],
+    account: Annotated[Account, Depends(current_account)],
     session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> dict:
@@ -132,7 +140,7 @@ def get_one(
         auctions.settle_one(session, auction_id, clock)  # règlement paresseux à la lecture
     except auctions.AuctionError as exc:
         raise _error(exc) from None
-    return _view(session, session.get(Auction, auction_id), clock)
+    return _view(session, session.get(Auction, auction_id), clock, account.id)
 
 
 @router.post("/auctions/{auction_id}/bids", status_code=201)
@@ -147,7 +155,7 @@ def bid(
         auctions.place_bid(session, auction_id, account.id, body.amount, clock)
     except (auctions.AuctionError, ledger.InsufficientFunds) as exc:
         raise _error(exc) from None
-    return _view(session, session.get(Auction, auction_id), clock)
+    return _view(session, session.get(Auction, auction_id), clock, account.id)
 
 
 @router.post("/auctions/{auction_id}/cancel")
@@ -161,7 +169,7 @@ def cancel(
         auctions.cancel(session, auction_id, account.id, clock)
     except auctions.AuctionError as exc:
         raise _error(exc) from None
-    return _view(session, session.get(Auction, auction_id), clock)
+    return _view(session, session.get(Auction, auction_id), clock, account.id)
 
 
 @router.post("/auctions/{auction_id}/bets", status_code=201)
@@ -183,26 +191,34 @@ def place_bet(
 def my_bets(
     account: Annotated[Account, Depends(current_account)],
     session: DbSession,
+    clock: Annotated[Clock, Depends(get_clock)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Offset = 0,
 ) -> list[dict]:
     """Seulement mes paris : les pronostics des autres restent cachés."""
     rows = session.execute(
-        select(Bet, Auction)
+        select(Bet, Auction, Track)
         .join(Auction, Auction.id == Bet.auction_id)
+        .join(Track, Track.recording_mbid == Auction.recording_mbid)
         .where(Bet.account_id == account.id)
         .order_by(Bet.created_at.desc(), Bet.auction_id)
         .limit(limit)
         .offset(offset)
     )
+    now = clock.now()
     return [
         {
             "auction_id": b.auction_id,
+            "title": t.title,
+            "artist": t.artist,
+            "seconds_left": max(0, math.ceil((a.ends_at - now).total_seconds()))
+            if a.status == "open"
+            else 0,
             "prediction": b.prediction,
             "stake": b.stake,
             "auction_status": a.status,
             "final_price": a.final_price,
             "payout": b.payout,
         }
-        for b, a in rows
+        for b, a, t in rows
     ]

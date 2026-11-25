@@ -50,6 +50,17 @@
       <div id="auction-detail"></div>
     </section>
 
+    <!-- Écran Paris : les miens seulement -->
+    <section id="bets" hidden>
+      <h2>Mes paris</h2>
+      <details><summary>Comment ça marche</summary><ul id="bet-rules"></ul></details>
+      <p id="no-bet" hidden>Aucun pari. Parie depuis le détail d'une enchère.</p>
+      <h3 id="open-bets-title">En cours</h3>
+      <ul id="open-bets"></ul>
+      <h3 id="done-bets-title">Terminés</h3>
+      <ul id="done-bets"></ul>
+    </section>
+
     <!-- Écran 2 : joueur connecté -->
     <section id="home" hidden>
       <h2 id="player-name"></h2>
@@ -68,6 +79,7 @@
     <a href="#boosters">Boosters</a>
     <a href="#collection">Collection</a>
     <a href="#auctions">Enchères</a>
+    <a href="#bets">Paris</a>
   </nav>
   <script src="app.js"></script>
 </body>
