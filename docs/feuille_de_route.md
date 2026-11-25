@@ -19,7 +19,7 @@ Terminé et fusionné (PR #1 à #7) : squelette, comptes et journal de monnaie, 
 | A03 | Boosters | Voir son stock, ouvrir un booster | ✅ | [A03](etapes/A03_boosters.md) | #13 |
 | A04 | Collection et recyclage | Liste des titres, recherche, recycler un doublon | ✅ | [A04](etapes/A04_collection.md) | #14 |
 | A05 | Enchères en lecture | Liste, détail, compte à rebours | ✅ | [A05](etapes/A05_encheres_lecture.md) | #15 |
-| A06 | Enchères : créer et annuler | Mettre un titre aux enchères | ✅ | [A06](etapes/A06_creer_annuler.md) | PRNUM |
+| A06 | Enchères : créer et annuler | Mettre un titre aux enchères | ✅ | [A06](etapes/A06_creer_annuler.md) | #16 |
 | A07 | Enchères : miser | Surenchérir, mise bloquée puis rendue | ⬜ | | |
 | A08 | Paris | Parier, voir ses paris, interdits expliqués | ⬜ | | |
 | A09 | Rafraîchissement automatique | Écrans à jour sans recharger | ⬜ | | |

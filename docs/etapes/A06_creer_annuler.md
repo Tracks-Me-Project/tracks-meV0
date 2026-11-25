@@ -1,7 +1,7 @@
 # Étape A06 : créer et annuler une enchère
 
 - **Statut** : ✅ terminé le 2026-11-25
-- **Branche** : `a06-creer-annuler` · **PR** : PRNUM
+- **Branche** : `a06-creer-annuler` · **PR** : #16
 
 ## 1. Résumé fonctionnel
 Depuis la Collection, chaque titre propose « Mettre aux enchères » : on choisit le prix de départ et la durée, on confirme, et on arrive sur le détail de la vente. Le titre quitte la collection pendant la vente. Le vendeur peut « Annuler la vente » pendant la première moitié de la durée, tant que personne n'a enchéri ; le temps restant pour annuler est affiché. Les refus sont expliqués en clair.
