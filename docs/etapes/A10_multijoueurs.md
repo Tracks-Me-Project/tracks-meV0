@@ -1,7 +1,7 @@
 # Étape A10 : scénario multi-joueurs
 
 - **Statut** : ✅ terminé le 2026-11-25
-- **Branche** : `a10-multijoueurs` · **PR** : PRNUM
+- **Branche** : `a10-multijoueurs` · **PR** : #20
 
 ## 1. Résumé fonctionnel
 Des joueurs virtuels peuvent jouer sur le serveur en même temps que de vrais joueurs : ils ouvrent des boosters, vendent, misent, parient, recyclent et annulent. Une commande vérifie après une partie que les comptes sont justes. Un mode d'emploi guide l'installation puis une partie d'environ 15 minutes : `docs/guide_test_alpha.md`.
