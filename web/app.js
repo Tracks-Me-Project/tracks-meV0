@@ -20,7 +20,7 @@ async function api(path, options = {}) {
 }
 
 function show(screen) {
-  for (const id of ["login", "home", "boosters", "collection", "auctions", "auction"]) $(id).hidden = id !== screen;
+  for (const id of ["login", "home", "boosters", "collection", "auctions", "auction", "bets"]) $(id).hidden = id !== screen;
   $("nav").hidden = screen === "login";
   for (const link of $("nav").children) {
     // le détail d'une enchère reste sous l'onglet « Enchères »
@@ -36,6 +36,8 @@ function logout() {
   $("search").value = "";
   $("auction-list").replaceChildren();
   $("auction-detail").replaceChildren();
+  $("open-bets").replaceChildren();
+  $("done-bets").replaceChildren();
   show("login");
 }
 
@@ -48,6 +50,7 @@ async function refresh() {
     if (location.hash === "#boosters") await showBoosters();
     else if (location.hash === "#collection") await showCollection();
     else if (location.hash === "#auctions") await showAuctions();
+    else if (location.hash === "#bets") await showBets();
     else if (location.hash.startsWith("#auction/")) await showAuction(location.hash.split("/")[1]);
     else await showHome();
   } catch (err) {
@@ -78,6 +81,12 @@ const REFUSALS = {
   AlreadyTopBidder: () => "Tu es déjà en tête.",
   OwnAuction: () => "Tu ne peux pas miser sur ta propre enchère.",
   BettorCannotBid: () => "Tu as parié sur cette enchère : tu ne peux pas y miser.",
+  BetsClosed: () => "Les paris sont fermés pour cette enchère.",
+  BetOnOwnAuction: () => "Tu ne peux pas parier sur ta propre enchère.",
+  BidderCannotBet: () => "Tu as enchéri : tu ne peux pas parier sur cette enchère.",
+  AlreadyBet: () => "Tu as déjà parié sur cette enchère.",
+  PredictionTooLow: (d) => `Pronostic trop bas : le prix a déjà atteint ${d.minimum}.`,
+  TooManyOpenBets: () => "Tu as déjà le maximum de paris en cours.",
 };
 
 async function showHome() {
@@ -205,6 +214,7 @@ async function showAuction(id) {
     element("h2", a.title),
     element("p", [a.artist, a.album].filter(Boolean).join(" · ")),
     element("p", badge(a, me.id), "badge"),
+    element("p", a.my_prediction === null ? "" : `Ton pronostic : ${a.my_prediction}`, "badge"),
     status,
     list,
   );
@@ -217,9 +227,14 @@ async function showAuction(id) {
     $("auction-detail").append(window, button);
     entries.push({ el: window, label: "Annulable encore", seconds: a.cancel_seconds_left });
   }
-  if (open && a.seller_id !== me.id && a.leader_id !== me.id) {
-    $("auction-detail").append(bidForm(a, me.available));
+  if (open && a.seller_id !== me.id) {
+    if (a.my_prediction !== null) {
+      $("auction-detail").append(element("p", "Tu as parié : tu ne peux pas enchérir sur cette enchère."));
+    } else if (a.leader_id !== me.id) {
+      $("auction-detail").append(bidForm(a, me.available));
+    }
   }
+  if (open) $("auction-detail").append(...betSection(a, me, entries));
   show("auction");
   countdown(entries, () => showAuction(id));
 }
@@ -379,7 +394,8 @@ function bidForm(a, available) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const question = `Miser ${amount.value} sur « ${a.title} » ?`;
-    if (!confirm(`${question}\nLa somme est bloquée tant que tu mènes.`)) return;
+    const noBet = a.bets_seconds_left > 0 ? "\nTu ne pourras plus parier sur cette enchère." : "";
+    if (!confirm(`${question}\nLa somme est bloquée tant que tu mènes.${noBet}`)) return;
     submit.disabled = true; // pas de double appui
     message();
     try {
@@ -393,6 +409,99 @@ function bidForm(a, available) {
     }
   });
   return form;
+}
+
+// Section « pari » du détail : le formulaire, ou la raison pour laquelle il n'y en a pas.
+function betSection(a, me, entries) {
+  const title = element("h3", "Pari sur le prix final");
+  const why = (text) => [title, element("p", text)];
+  if (a.seller_id === me.id) return why("C'est ta vente : tu ne peux pas parier dessus.");
+  if (a.my_prediction !== null) {
+    return why(`Tu as parié ${a.my_prediction} (mise ${a.bet_stake}). Résultat à la fin.`);
+  }
+  if (a.i_have_bid) return why("Tu as enchéri : tu ne peux pas parier sur cette enchère.");
+  if (a.bets_seconds_left === 0) return why("Les paris sont fermés pour cette enchère.");
+
+  const closes = element("p", "");
+  entries.push({ el: closes, label: "Paris ouverts encore", seconds: a.bets_seconds_left });
+  const form = document.createElement("form");
+  const prediction = document.createElement("input");
+  const min = a.current_price;
+  Object.assign(prediction, { type: "number", inputMode: "numeric", min, step: 1, value: min, required: true });
+  const label = element("label", `Prix final prévu (mise ${a.bet_stake}, disponible ${me.available})`);
+  label.append(prediction);
+  const submit = element("button", "Parier");
+  form.append(label, submit);
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const question = `Parier que « ${a.title} » se terminera à ${prediction.value} ?`;
+    const warning = `Mise ${a.bet_stake}, bloquée jusqu'à la fin. Tu ne pourras plus enchérir ici.`;
+    if (!confirm(`${question}\n${warning}`)) return;
+    submit.disabled = true; // pas de double appui
+    message();
+    try {
+      const body = JSON.stringify({ prediction: Number(prediction.value) });
+      await api(`/auctions/${a.id}/bets`, { method: "POST", body });
+      await showAuction(a.id);
+      message("Pari enregistré.", true);
+    } catch (err) {
+      await showAuction(a.id).catch(() => {});
+      fail(err);
+    }
+  });
+  return [title, closes, form];
+}
+
+// Les chiffres viennent des règles chargées par le serveur.
+function betRules({ bet }) {
+  const [first, second, third] = bet.podium_split_percent;
+  return [
+    `Mise fixe : ${bet.stake_percent_of_start_price} % du prix de départ.`,
+    `Paris ouverts pendant ${bet.close_at_percent_of_duration} % de la durée, ${bet.max_open_per_account} en cours au plus.`,
+    `Les 3 pronostics les plus proches se partagent ${bet.podium_share_percent} % de la cagnotte (${first} / ${second} / ${third}), les autres le reste.`,
+    `À 3 parieurs : toute la cagnotte au podium. À 2 : ${bet.two_bettors_split_percent.join(" / ")}. Seul : remboursé.`,
+    `Gain plafonné à ${bet.payout_cap_multiple} fois la mise. Enchère annulée ou invendue : remboursé.`,
+  ];
+}
+
+function betResult(b) {
+  if (b.auction_status === "cancelled") return "Enchère annulée : mise remboursée";
+  if (b.auction_status === "unsold") return "Invendue : mise remboursée";
+  const net = b.payout - b.stake;
+  return `Prix final ${b.final_price} · gain ${b.payout} (net ${net > 0 ? "+" : ""}${net})`;
+}
+
+async function showBets() {
+  const stale = watchScreen();
+  const [game, rows] = await Promise.all([rules, api("/bets")]);
+  if (stale()) return;
+  const entries = [];
+  const lists = { open: [], done: [] };
+  for (const b of rows) {
+    const open = b.auction_status === "open";
+    const item = document.createElement("li");
+    const link = document.createElement("a");
+    const state = element("small", open ? "" : betResult(b));
+    link.href = `#auction/${b.auction_id}`;
+    link.append(
+      element("span", b.title),
+      element("small", b.artist),
+      element("small", `Ton pronostic : ${b.prediction} · mise ${b.stake}`),
+      state,
+    );
+    item.append(link);
+    lists[open ? "open" : "done"].push(item);
+    if (open) entries.push({ el: state, label: "Fin dans", seconds: b.seconds_left });
+  }
+  for (const [name, items] of Object.entries(lists)) {
+    $(`${name}-bets`).replaceChildren(...items);
+    $(`${name}-bets-title`).hidden = items.length === 0;
+  }
+  $("bet-rules").replaceChildren(...betRules(game).map((text) => element("li", text)));
+  $("no-bet").hidden = rows.length > 0;
+  show("bets");
+  countdown(entries, showBets);
 }
 
 async function cancelAuction(button, a) {

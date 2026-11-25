@@ -21,7 +21,7 @@ Terminé et fusionné (PR #1 à #7) : squelette, comptes et journal de monnaie, 
 | A05 | Enchères en lecture | Liste, détail, compte à rebours | ✅ | [A05](etapes/A05_encheres_lecture.md) | #15 |
 | A06 | Enchères : créer et annuler | Mettre un titre aux enchères | ✅ | [A06](etapes/A06_creer_annuler.md) | #16 |
 | A07 | Enchères : miser | Surenchérir, mise bloquée puis rendue | ✅ | [A07](etapes/A07_miser.md) | #17 |
-| A08 | Paris | Parier, voir ses paris, interdits expliqués | ⬜ | | |
+| A08 | Paris | Parier, voir ses paris, interdits expliqués | ✅ | [A08](etapes/A08_paris.md) | #18 |
 | A09 | Rafraîchissement automatique | Écrans à jour sans recharger | ⬜ | | |
 | A10 | Scénario multi-joueurs | Plusieurs joueurs et bots, mode d'emploi | ⬜ | | |
 | A11 | Bilan de l'alpha | Synthèse claire pour l'associé | ⬜ | | |

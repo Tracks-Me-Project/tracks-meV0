@@ -137,3 +137,31 @@ def test_view_cancel_seconds_left(client, session, clock):
     url = f"/auctions/{second['id']}"
     clock.advance(timedelta(minutes=15))
     assert client.get(url, headers=a).json()["cancel_seconds_left"] == 0  # délai passé
+
+
+def test_view_and_bet_list_for_the_viewer_only(client, session, clock):
+    seller = _player(client, session, "s", 1)
+    bettor, bidder = _player(client, session, "p"), _player(client, session, "e")
+    body = {"recording_mbid": "r1", "start_price": 100, "duration_minutes": 30}
+    aid = client.post("/auctions", headers=seller, json=body).json()["id"]
+    url = f"/auctions/{aid}"
+    client.post(f"{url}/bets", headers=bettor, json={"prediction": 123})
+    client.post(f"{url}/bids", headers=bidder, json={"amount": 100})
+
+    def seen(headers):
+        v = client.get(url, headers=headers).json()
+        return v["my_prediction"], v["i_have_bid"], v["bets_seconds_left"]
+
+    assert seen(bettor) == (123, False, 900)
+    assert seen(bidder) == (None, True, 900)
+    assert seen(seller) == (None, False, 900)  # le pronostic d'un autre ne sort jamais
+    assert "123" not in client.get(url, headers=seller).text
+    assert client.get("/bets", headers=bidder).json() == []
+    (bet,) = client.get("/bets", headers=bettor).json()
+    assert (bet["title"], bet["artist"]) == ("t", "X")
+    assert (bet["seconds_left"], bet["payout"]) == (1800, None)
+
+    clock.advance(timedelta(minutes=30))
+    assert seen(bettor)[2] == 0
+    (bet,) = client.get("/bets", headers=bettor).json()
+    assert (bet["auction_status"], bet["seconds_left"], bet["payout"]) == ("sold", 0, 10)

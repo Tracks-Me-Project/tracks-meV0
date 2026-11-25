@@ -252,6 +252,12 @@ def settle_due(session: Session, clock: Clock) -> int:
     return settled
 
 
+def bets_close_at(auction: Auction) -> datetime:
+    """Instant à partir duquel on ne peut plus parier."""
+    pct = get_rules().bet.close_at_percent_of_duration
+    return auction.starts_at + (auction.ends_at - auction.starts_at) * pct // 100
+
+
 def place_bet(
     session: Session, auction_id: int, account_id: int, prediction: int, clock: Clock
 ) -> Bet:
@@ -261,8 +267,7 @@ def place_bet(
     auction = _lock_auction(session, auction_id)
     if auction.status != "open" or now >= auction.ends_at:
         raise AuctionClosed
-    duration = auction.ends_at - auction.starts_at
-    if now >= auction.starts_at + duration * rules.close_at_percent_of_duration // 100:
+    if now >= bets_close_at(auction):
         raise BetsClosed
     if account_id == auction.seller_id:
         raise BetOnOwnAuction

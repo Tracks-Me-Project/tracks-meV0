@@ -317,3 +317,9 @@ def test_cancel_deadline_is_half_the_duration(session, clock, world):
     seller, *_ = world
     auction = _sell(session, clock, seller)  # 60 min
     assert auctions.cancel_deadline(auction) == T0 + timedelta(minutes=30)
+
+
+def test_bets_close_at_half_the_duration(session, clock, world):
+    seller, *_ = world
+    auction = _sell(session, clock, seller)  # 60 min
+    assert auctions.bets_close_at(auction) == T0 + timedelta(minutes=30)
