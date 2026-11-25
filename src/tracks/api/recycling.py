@@ -2,13 +2,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 
 from tracks import recycling
 from tracks.api.accounts import current_account
-from tracks.api.deps import Amount, Mbid, get_clock
+from tracks.api.deps import Amount, DbSession, Mbid, get_clock
 from tracks.clock import Clock
-from tracks.db import get_session
 from tracks.models import Account
 
 router = APIRouter()
@@ -23,7 +21,7 @@ class RecycleRequest(BaseModel):
 def recycle(
     body: RecycleRequest,
     account: Annotated[Account, Depends(current_account)],
-    session: Annotated[Session, Depends(get_session)],
+    session: DbSession,
     clock: Annotated[Clock, Depends(get_clock)],
 ) -> dict:
     try:
